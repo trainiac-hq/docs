@@ -112,7 +112,8 @@ read `error`.
 | **400** | Your argument | `invalid_integer`, `invalid_time`, `invalid_date`, `invalid_boolean`, `missing_station`, `refused`, `station ambiguous`, `limit out of range` (and other `… out of range`), `origin and destination are the same` |
 | **404** | Nothing there | `not_found` (no such endpoint), `station not resolved`, `train not found` |
 | **405** | Not `GET` | `method_not_allowed` |
-| **503** | The database did not answer | `database_unavailable`, `query_failed`, `station_lookup_failed` |
+| **429** | You are over your per-minute allowance | `rate_limited` — see [Fair use](#fair-use) |
+| **503** | The database is busy or did not answer | `database_busy` (no query slot came free; retry in a second), `database_unavailable`, `query_failed`, `station_lookup_failed` |
 | **500** | Our bug: the query and the model disagree | `malformed_result` |
 
 Malformed arguments carry a `message`:
@@ -699,12 +700,44 @@ Anything that is not an MCP client should use the REST endpoints.
 
 ## Fair use
 
-No keys, no rate limits today. Please cache what you can and identify
-your client with a `User-Agent`. Requests are logged (endpoint, timing,
-status, forwarded IP, user agent) to keep the usage dashboards honest;
-nothing else is kept. Polling `/api/positions` more often than every
-30 seconds or so buys nothing — that is roughly how often its picture
-changes.
+No keys, and generous limits, enforced the same way for everyone. Both
+limits count **units of work**, not requests, because a journey is not
+one of the same thing a station search is:
+
+| Request | Units |
+| --- | --- |
+| `/api/journey` (with changes — the default) | 5 |
+| `/api/journey?max_changes=0` | 2 |
+| `/api/departures` | 3 |
+| everything else | 1 |
+
+- **120 units a minute per client address**, across `/api` and `/mcp`
+  together, over a sliding window — 40 departure boards, or 24 journeys.
+  Over it you get a **429** with a `Retry-After` header and this body, and
+  the refused request still spends its units, so backing off is the only
+  way through:
+
+  ```json
+  {"error":"rate_limited","message":"This address has spent its allowance of 120 request units a minute (a journey is 5, a departure board 3, most other calls 1). Try again in 42 seconds.","retry_after_seconds":42}
+  ```
+
+- **20 units of query running at once, across all clients** — four
+  journeys, or twenty station searches. A request waits up to two seconds
+  for its units; if they never come free it gets a **503** with
+  `Retry-After: 1`:
+
+  ```json
+  {"error":"database_busy","message":"Too many queries are running right now. Try again in a moment.","retry_after_seconds":1}
+  ```
+
+  This one only applies to requests that query — `GET /api` and MCP
+  `initialize`/`tools/list` never wait for it.
+
+Honour `Retry-After`, cache what you can (a departure board does not
+change faster than every 30 seconds or so), and identify your client with
+a `User-Agent`. Requests are logged (endpoint, timing, status, forwarded
+IP, user agent) to keep the usage dashboards honest; nothing else is
+kept.
 
 ## Where the data comes from
 
