@@ -568,6 +568,10 @@ export type Index = {
 	openapi: string;
 	docs: string;
 	mcp: string;
+	/**
+	 * Who may use the API: personal, non-commercial projects only, and a link to the full terms.
+	 */
+	terms: string;
 	endpoints: IndexEndpoint[];
 };
 

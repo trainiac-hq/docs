@@ -3053,6 +3053,10 @@
             "type": "string",
             "format": "uri"
           },
+          "terms": {
+            "description": "Who may use the API: personal, non-commercial projects only, and a link to the full terms.",
+            "type": "string"
+          },
           "endpoints": {
             "type": "array",
             "items": {
@@ -3066,6 +3070,7 @@
           "openapi",
           "docs",
           "mcp",
+          "terms",
           "endpoints"
         ],
         "additionalProperties": false

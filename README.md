@@ -10,6 +10,10 @@ Rail's Darwin forecasts.
 No sign-up, no API keys. Everything is a `GET`, and it works straight from a
 browser (CORS is open).
 
+**For personal, non-commercial projects only.** Hobby apps, home dashboards,
+learning and research are all welcome; anything commercial isn't. See the
+[terms of use](#terms-of-use).
+
 ```sh
 curl 'https://api.traini.ac/v1/departures/PAD?limit=5'   # next trains from Paddington
 curl 'https://api.traini.ac/v1/journey/PAD/RDG'          # Paddington to Reading
@@ -620,6 +624,32 @@ server at `https://api.traini.ac/mcp`, so assistants like Claude can answer
 
 - **Any other MCP client**: add a remote server over Streamable HTTP at the
   same URL. There's no key and no sign-in.
+
+## Terms of use
+
+The Trainiac API (everything under `api.traini.ac`, including the MCP
+server) is free for **personal, non-commercial projects**: things you build
+for yourself and your friends, hobby apps you don't charge for, home
+dashboards, learning, research and open-source tinkering.
+
+It is **not** for commercial use. Please don't:
+
+- use it in a product or service that is sold, subscribed to, or carries
+  ads, or in a business's own tools;
+- resell, redistribute or mirror its answers, or build a public copy of
+  Trainiac (or a bulk dataset) from them;
+- try to get around the limits, for example by spreading requests across
+  many addresses.
+
+We can change the API, rate-limit or block any client, or withdraw access
+at any time, and it comes with no guarantee of being right, complete or up.
+Don't rely on it for anything safety-critical.
+
+**Building something commercial?** The data underneath comes from Network
+Rail ([datafeeds.networkrail.co.uk](https://datafeeds.networkrail.co.uk))
+and National Rail ([opendata.nationalrail.co.uk](https://opendata.nationalrail.co.uk)),
+whose own licences cover commercial use: go to them directly. Not sure
+whether your project counts? Ask on [Discord](https://traini.ac/discord).
 
 ## Fair use
 
