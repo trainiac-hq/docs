@@ -584,19 +584,41 @@ GET /v1/departures/PAD?from_time=25:99       → 400
 ## Use it from code
 
 ```ts
-import type { Answer } from "./v1"; // v1.d.ts from this repo
+import type { Answer, Estimate } from "./v1"; // v1.d.ts from this repo
 
-const res = await fetch(`https://api.traini.ac/v1/departures/${crs}?limit=10`);
+const station = "PAD";
+const res = await fetch(`https://api.traini.ac/v1/departures/${station}?limit=10`);
 const body = (await res.json()) as Answer<"/v1/departures/{station}">;
-if (body.type === "error") throw new Error(`${body.error.type}: ${body.error.message}`);
 
-for (const d of body.data) {
-  const when =
-    d.departs.estimate.type === "forecast" ? `exp ${d.departs.estimate.at.slice(11, 16)}`
-    : d.departs.estimate.type === "cancelled" ? "cancelled"
-    : d.departs.estimate.type === "delayed_no_estimate" ? "delayed"
-    : "";
-  console.log(d.departs.scheduled.slice(11, 16), d.destination.name, when);
+if (body.type === "error") {
+  throw new Error(body.error.message);
+}
+
+for (const departure of body.data) {
+  const time = clock(departure.departs.scheduled);
+  const status = describe(departure.departs.estimate);
+  console.log(`${time}  ${departure.destination.name}  ${status}`);
+}
+
+/** "2026-10-05T14:05:00+01:00" → "14:05" */
+function clock(iso: string): string {
+  return iso.slice(11, 16);
+}
+
+/** Every kind of estimate, so TypeScript tells you if a new one appears. */
+function describe(estimate: Estimate): string {
+  switch (estimate.type) {
+    case "actual":
+      return `left ${clock(estimate.at)}`;
+    case "forecast":
+      return `expected ${clock(estimate.at)}`;
+    case "delayed_no_estimate":
+      return "delayed";
+    case "cancelled":
+      return "cancelled";
+    case "no_information":
+      return "";
+  }
 }
 ```
 
