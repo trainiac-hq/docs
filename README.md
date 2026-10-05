@@ -35,6 +35,7 @@ Base URL: `https://api.traini.ac`. `GET /api` lists everything as JSON.
 | Today's cancellations, with reasons | [`/api/cancellations`](#cancellations) |
 | Today's headline numbers | [`/api/summary`](#summary) |
 | Every train on a map | [`/api/positions`](#positions) |
+| Whether the data is fresh right now | [`/api/status`](#status) |
 
 ### Five things worth knowing
 
@@ -589,6 +590,47 @@ before you quote it.
 
 </details>
 
+### Status
+
+`GET /api/status`. Whether the API is answering, how fresh each feed's data
+is, and how many trains are running. It's answered from a snapshot at most
+15 seconds old, so polling it is cheap: 1 unit, and it never waits for the
+database.
+
+<details>
+<summary><b>Example and fields</b></summary>
+
+<br>
+
+```json
+{
+  "generated_at": "2026-10-05T10:31:20+01:00",
+  "status": "ok",
+  "feeds": {
+    "trust":  { "state": "fresh", "last_stored_seconds_ago": 3,  "stale_after_seconds": 300 },
+    "td":     { "state": "fresh", "last_stored_seconds_ago": 1,  "stale_after_seconds": 300 },
+    "darwin": { "state": "fresh", "last_stored_seconds_ago": 12, "stale_after_seconds": 600 }
+  },
+  "trains_running": 2140,
+  "measured_at": "2026-10-05T10:31:09+01:00"
+}
+```
+
+Not in the usual envelope: it describes the API rather than the railway.
+
+- `feeds`: TRUST (train movements), TD (signalling berth steps) and
+  Darwin (forecasts). `last_stored_seconds_ago` is how old the newest data
+  we have from that feed is.
+- `state` is `fresh` up to `stale_after_seconds`, `stale` after it,
+  `silent` when nothing has arrived for hours, and `unknown` when we
+  couldn't check.
+- `status` is `ok` when every feed is fresh, otherwise `degraded`. Answers
+  still work when degraded; they just know less about what's live.
+- `trains_running`: trains on the [live map](https://traini.ac) right now,
+  seen in the last 30 minutes. `null` if we couldn't count them.
+
+</details>
+
 ### Positions
 
 `GET /api/positions`. Every train seen in the last 30 minutes that we can
@@ -639,7 +681,7 @@ you whose problem it is:
 | **404** | `not_found` (no such endpoint), `station not resolved`, `train not found` |
 | **405** | `method_not_allowed` |
 | **429** | `rate_limited` |
-| **503** | `database_busy` (retry in a second), `database_unavailable`, `query_failed`, `station_lookup_failed` |
+| **503** | `database_busy` (retry in a second), `database_unavailable`, `query_failed`, `station_lookup_failed`, `status_unavailable` |
 | **500** | `malformed_result` |
 
 Bad arguments come with a `message`:
@@ -706,9 +748,16 @@ The same data is a [Model Context Protocol](https://modelcontextprotocol.io)
 server at `https://api.traini.ac/mcp`, so assistants like Claude can answer
 "when's the next train to Reading?" with live data.
 
-```sh
-claude mcp add --transport http trainiac https://api.traini.ac/mcp
-```
+- **Claude** (web, desktop and mobile): Settings → Connectors → Add custom
+  connector, and paste `https://api.traini.ac/mcp`.
+- **Claude Code**:
+
+  ```sh
+  claude mcp add --transport http trainiac https://api.traini.ac/mcp
+  ```
+
+- **Any other MCP client**: add a remote server over Streamable HTTP at the
+  same URL. There's no key and no sign-in.
 
 The tools match the endpoints one to one: `departures`, `find_station`,
 `station_activity`, `journey`, `train`, `delays`, `cancellations` and
@@ -728,13 +777,29 @@ an MCP client should use the REST endpoints.
 ## Fair use
 
 It's free, and the limits are generous and the same for everyone. They
-count **units of work**: a journey is 5 units, a direct-only journey 2, a
-departure board 3, and everything else 1.
+count **units of work**, not requests:
+
+| Request | Units |
+| --- | --- |
+| [Journey](#journey) | 5 |
+| [Journey](#journey) with `max_changes=0` (direct trains only) | 2 |
+| [Departures](#departures) | 3 |
+| Everything else | 1 |
 
 - **120 units a minute per address** (about 40 departure boards). Go over
   and you get a **429** with `Retry-After`.
 - **20 units running at once across everyone.** If the database is busy, a
   request waits up to two seconds, then gets a **503** with `Retry-After: 1`.
+
+Every answer tells you where you stand, in headers a browser can read too:
+
+| Header | Means |
+| --- | --- |
+| `X-Request-Units` | What this request cost |
+| `RateLimit-Limit` | Your allowance a minute: `120` |
+| `RateLimit-Remaining` | Units left after this request |
+| `RateLimit-Reset` | Seconds until what you've spent starts coming back |
+| `RateLimit-Policy` | The same, in one line: `120;w=60` |
 
 Please honour `Retry-After`, cache what you can (a departure board doesn't
 change faster than every 30 seconds or so), and send a `User-Agent` that
