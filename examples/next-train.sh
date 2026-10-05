@@ -12,32 +12,36 @@ to=${2:?usage: next-train.sh FROM TO}
 
 enc() { jq -rn --arg s "$1" '$s | @uri'; }
 
-body=$(curl -s -w '\n%{http_code}' \
-  "https://api.traini.ac/api/journey/$(enc "$from")/$(enc "$to")?limit=1")
-status=${body##*$'\n'}
-json=${body%$'\n'*}
+json=$(curl -s "https://api.traini.ac/v1/journey/$(enc "$from")/$(enc "$to")?limit=1")
 
-if [ "$status" != 200 ]; then
-  echo "HTTP $status: $(jq -r '.error' <<<"$json")" >&2
-  jq -r '.hint // empty' <<<"$json" >&2
+# Every answer says what it is: {"type": "ok", ...} or {"type": "error", ...}.
+if [ "$(jq -r '.type' <<<"$json")" = error ]; then
+  jq -r '"\(.error.type): \(.error.message)"' <<<"$json" >&2
   exit 1
 fi
 
 jq -r '
-  .resolved as $r
-  | if .result_count == 0 then
-      "No trains from \($r.from.name) to \($r.to.name) today."
+  def clock: .[11:16];
+  def when: .scheduled | clock;
+  def expected:
+    if .estimate.type == "forecast" and (.delay_minutes // 0) > 0 then " (expected \(.estimate.at | clock))"
+    elif .estimate.type == "cancelled" then " (cancelled)"
+    elif .estimate.type == "delayed_no_estimate" then " (delayed)"
+    else "" end;
+  def platform:
+    if .type == "known" then .number else "?" end;
+  (.request.from.resolution.name) as $from
+  | (.request.to.resolution.name) as $to
+  | if (.data | length) == 0 then
+      "No trains from \($from) to \($to) today."
     else
-      .results[0]
-      | "\($r.from.name) → \($r.to.name)",
-        "  departs \(.departs[11:16])" +
-          (if .expected_departs and .expected_departs != .departs
-           then " (expected \(.expected_departs[11:16]))" else "" end) +
-          ", arrives \(.arrives[11:16]) — \(.duration_minutes) min",
-        (if .changes == 0 then
-           "  \(.headcode) \(.operator), platform \(.platform // "?"), \(.status_text)"
+      .data[0]
+      | "\($from) → \($to)",
+        "  departs \(.departs | when)\(.departs | expected), arrives \(.arrives | when) — \(.duration_minutes) min",
+        (if .type == "direct" then
+           "  \(.leg.train.headcode) \(.leg.train.operator.name // ""), platform \(.leg.departure_platform | platform)"
          else
-           "  change at \(.interchange.name) (\(.connection_minutes) min, connection \(.connection_status))"
+           (.connections[] | "  change at \(.at.name) (\(.minutes) min, \(.outlook))")
          end)
     end
 ' <<<"$json"

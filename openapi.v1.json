@@ -1,0 +1,3821 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "traini.ac API",
+    "version": "1",
+    "description": "Live UK rail data from Network Rail's and National Rail's open feeds. Every answer is an Ok or an ErrorResponse, told apart by `type` and by the HTTP status. Every key is always present: null means a value does not exist, and states (cancelled, no information yet, withheld) are union members with a `type`."
+  },
+  "servers": [
+    {
+      "url": "https://api.traini.ac"
+    }
+  ],
+  "security": [],
+  "paths": {
+    "/v1": {
+      "get": {
+        "operationId": "index",
+        "summary": "What is here.",
+        "x-request-units": 1,
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad argument.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A station, train or endpoint we could not find.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Anything but GET.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-client allowance. Retry-After says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The query and the model disagree: ours to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is busy or unavailable. Retry-After when busy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/departures/{station}": {
+      "get": {
+        "operationId": "departures",
+        "summary": "Live departure board.",
+        "description": "Late runners stay listed until their expected departure passes.",
+        "x-request-units": 3,
+        "parameters": [
+          {
+            "name": "station",
+            "in": "path",
+            "required": true,
+            "description": "A CRS code (PAD), a name (London Paddington, percent-encoded) or a group (London).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Rows to return, default 15.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "from_time",
+            "in": "query",
+            "required": false,
+            "description": "HH:MM or HHMM, UK local. Default now.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to_time",
+            "in": "query",
+            "required": false,
+            "description": "HH:MM or HHMM, UK local. Default end of day.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "calling_at",
+            "in": "query",
+            "required": false,
+            "description": "Only services calling here later. A CRS code (PAD), a name (London Paddington, percent-encoded) or a group (London).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeparturesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad argument.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A station, train or endpoint we could not find.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Anything but GET.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-client allowance. Retry-After says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The query and the model disagree: ours to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is busy or unavailable. Retry-After when busy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/journey/{from}/{to}": {
+      "get": {
+        "operationId": "journey",
+        "summary": "Next trains from one station to another.",
+        "description": "Costs 2 units with max_changes=0, else 5.",
+        "x-request-units": 5,
+        "parameters": [
+          {
+            "name": "from",
+            "in": "path",
+            "required": true,
+            "description": "A CRS code (PAD), a name (London Paddington, percent-encoded) or a group (London).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "path",
+            "required": true,
+            "description": "A CRS code (PAD), a name (London Paddington, percent-encoded) or a group (London).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Rows to return, default 10.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "max_changes",
+            "in": "query",
+            "required": false,
+            "description": "0 for direct only. Default 1.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 8
+            }
+          },
+          {
+            "name": "min_interchange_min",
+            "in": "query",
+            "required": false,
+            "description": "Minimum minutes for a change. Default 5.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            }
+          },
+          {
+            "name": "from_time",
+            "in": "query",
+            "required": false,
+            "description": "HH:MM or HHMM, UK local. Default now.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to_time",
+            "in": "query",
+            "required": false,
+            "description": "HH:MM or HHMM, UK local. Default end of day.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JourneyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad argument.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A station, train or endpoint we could not find.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Anything but GET.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-client allowance. Retry-After says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The query and the model disagree: ours to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is busy or unavailable. Retry-After when busy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/train": {
+      "get": {
+        "operationId": "train",
+        "summary": "Where a train is.",
+        "x-request-units": 1,
+        "parameters": [
+          {
+            "name": "headcode",
+            "in": "query",
+            "required": false,
+            "description": "e.g. 1A23. Give this or train_id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "train_id",
+            "in": "query",
+            "required": false,
+            "description": "Exact TRUST id, from a departure or journey.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operator",
+            "in": "query",
+            "required": false,
+            "description": "Name fragment or ATOC code.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "description": "Origin name fragment.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "destination",
+            "in": "query",
+            "required": false,
+            "description": "Destination name fragment.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "description": "Run date, YYYY-MM-DD. Default the last 12 hours.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad argument.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A station, train or endpoint we could not find.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Anything but GET.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-client allowance. Retry-After says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The query and the model disagree: ours to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is busy or unavailable. Retry-After when busy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/delays": {
+      "get": {
+        "operationId": "delays",
+        "summary": "The worst-delayed trains running now.",
+        "x-request-units": 1,
+        "parameters": [
+          {
+            "name": "min_minutes",
+            "in": "query",
+            "required": false,
+            "description": "Default 10.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Rows to return, default 15.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "passenger_only",
+            "in": "query",
+            "required": false,
+            "description": "Default true.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DelaysResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad argument.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A station, train or endpoint we could not find.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Anything but GET.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-client allowance. Retry-After says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The query and the model disagree: ours to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is busy or unavailable. Retry-After when busy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cancellations": {
+      "get": {
+        "operationId": "cancellations",
+        "summary": "Today's cancellations, most recent first.",
+        "x-request-units": 1,
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Rows to return, default 15.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "passenger_only",
+            "in": "query",
+            "required": false,
+            "description": "Only services a passenger could board. Default false.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancellationsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad argument.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A station, train or endpoint we could not find.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Anything but GET.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-client allowance. Retry-After says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The query and the model disagree: ours to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is busy or unavailable. Retry-After when busy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/summary": {
+      "get": {
+        "operationId": "summary",
+        "summary": "Today's headline numbers.",
+        "x-request-units": 1,
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad argument.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A station, train or endpoint we could not find.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Anything but GET.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-client allowance. Retry-After says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The query and the model disagree: ours to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is busy or unavailable. Retry-After when busy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/stations": {
+      "get": {
+        "operationId": "stations",
+        "summary": "Find stations and other locations.",
+        "x-request-units": 1,
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "A name fragment, in any word order, or a code.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad argument.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A station, train or endpoint we could not find.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Anything but GET.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-client allowance. Retry-After says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The query and the model disagree: ours to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is busy or unavailable. Retry-After when busy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/stations/{station}/activity": {
+      "get": {
+        "operationId": "station_activity",
+        "summary": "Movements at a station in the last 3 hours.",
+        "x-request-units": 1,
+        "parameters": [
+          {
+            "name": "station",
+            "in": "path",
+            "required": true,
+            "description": "A CRS code (PAD), a name (London Paddington, percent-encoded) or a group (London).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Rows to return, default 15.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad argument.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A station, train or endpoint we could not find.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Anything but GET.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-client allowance. Retry-After says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The query and the model disagree: ours to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is busy or unavailable. Retry-After when busy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/status": {
+      "get": {
+        "operationId": "status",
+        "summary": "Feed freshness and trains running.",
+        "description": "Answered from a snapshot at most 15 seconds old.",
+        "x-request-units": 1,
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad argument.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A station, train or endpoint we could not find.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Anything but GET.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over the per-client allowance. Retry-After says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The query and the model disagree: ours to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is busy or unavailable. Retry-After when busy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Station": {
+        "description": "A public station.",
+        "type": "object",
+        "properties": {
+          "crs": {
+            "type": "string",
+            "description": "Three-letter CRS code."
+          },
+          "name": {
+            "type": "string",
+            "description": "Proper name, e.g. London Paddington."
+          }
+        },
+        "required": [
+          "crs",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "PlaceStation": {
+        "description": "A public station.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "station"
+          },
+          "crs": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "crs",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "PlaceLocation": {
+        "description": "A railway location with no public station code: a junction, siding or depot.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "location"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "Place": {
+        "description": "Somewhere a train is or calls.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PlaceStation"
+          },
+          {
+            "$ref": "#/components/schemas/PlaceLocation"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "station": "#/components/schemas/PlaceStation",
+            "location": "#/components/schemas/PlaceLocation"
+          }
+        }
+      },
+      "Operator": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "ATOC code, e.g. GW."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "e.g. Great Western Railway. null when we have no name for the code."
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "ServiceClass": {
+        "type": "string",
+        "enum": [
+          "passenger",
+          "bus",
+          "freight",
+          "ship",
+          "trip",
+          "empty_stock",
+          "unknown"
+        ],
+        "description": "What kind of service it is, from the timetable. unknown: no schedule matched."
+      },
+      "EstimateActual": {
+        "description": "It has happened, at this time.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "actual"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00."
+          }
+        },
+        "required": [
+          "type",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "EstimateForecast": {
+        "description": "Expected at this time.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "forecast"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "darwin",
+              "live_report"
+            ],
+            "description": "darwin: National Rail's forecast. live_report: the last TRUST report's lateness carried forward."
+          }
+        },
+        "required": [
+          "type",
+          "at",
+          "source"
+        ],
+        "additionalProperties": false
+      },
+      "EstimateDelayedNoEstimate": {
+        "description": "Known to be late, by an amount nobody can say yet.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "delayed_no_estimate"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "EstimateNoInformation": {
+        "description": "Nothing live or forecast is known yet. Not the same as on time.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "no_information"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "EstimateCancelled": {
+        "description": "The service is cancelled, so this will not happen.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "cancelled"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "Estimate": {
+        "description": "What is known about when something happens.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/EstimateActual"
+          },
+          {
+            "$ref": "#/components/schemas/EstimateForecast"
+          },
+          {
+            "$ref": "#/components/schemas/EstimateDelayedNoEstimate"
+          },
+          {
+            "$ref": "#/components/schemas/EstimateNoInformation"
+          },
+          {
+            "$ref": "#/components/schemas/EstimateCancelled"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "actual": "#/components/schemas/EstimateActual",
+            "forecast": "#/components/schemas/EstimateForecast",
+            "delayed_no_estimate": "#/components/schemas/EstimateDelayedNoEstimate",
+            "no_information": "#/components/schemas/EstimateNoInformation",
+            "cancelled": "#/components/schemas/EstimateCancelled"
+          }
+        }
+      },
+      "Time": {
+        "description": "A timetabled time and what is known about it.",
+        "type": "object",
+        "properties": {
+          "scheduled": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timetabled time."
+          },
+          "estimate": {
+            "$ref": "#/components/schemas/Estimate"
+          },
+          "delay_minutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Minutes after scheduled (negative is early) when the estimate has a time; null when it has none."
+          }
+        },
+        "required": [
+          "scheduled",
+          "estimate",
+          "delay_minutes"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformKnown": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "known"
+          },
+          "number": {
+            "type": "string",
+            "description": "A platform is a string: 4A, 10, B."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "actual",
+              "forecast",
+              "timetable"
+            ],
+            "description": "actual: where TRUST reported it. forecast: Darwin's. timetable: planned only, often wrong at large stations."
+          }
+        },
+        "required": [
+          "type",
+          "number",
+          "source"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformWithheld": {
+        "description": "Darwin asks that the platform not be shown yet.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "withheld"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformUnknown": {
+        "description": "No platform information.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "unknown"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "Platform": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PlatformKnown"
+          },
+          {
+            "$ref": "#/components/schemas/PlatformWithheld"
+          },
+          {
+            "$ref": "#/components/schemas/PlatformUnknown"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "known": "#/components/schemas/PlatformKnown",
+            "withheld": "#/components/schemas/PlatformWithheld",
+            "unknown": "#/components/schemas/PlatformUnknown"
+          }
+        }
+      },
+      "Train": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "TRUST train id, e.g. 671L50MK02. null until TRUST activates the train."
+          },
+          "uid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Timetable (CIF) uid, e.g. GW001. null where the answer does not identify the schedule."
+          },
+          "headcode": {
+            "type": "string",
+            "description": "e.g. 1L50. Headcodes repeat across the country."
+          },
+          "operator": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Operator"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "uid",
+          "headcode",
+          "operator"
+        ],
+        "additionalProperties": false
+      },
+      "TrainRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "TRUST train id."
+          },
+          "headcode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "headcode"
+        ],
+        "additionalProperties": false
+      },
+      "ResolutionStation": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "station"
+          },
+          "crs": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "crs",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "ResolutionGroup": {
+        "description": "A name for several stations, all of which were searched.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "group"
+          },
+          "name": {
+            "type": "string",
+            "description": "e.g. London Terminals."
+          },
+          "stations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Station"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "name",
+          "stations"
+        ],
+        "additionalProperties": false
+      },
+      "Resolution": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ResolutionStation"
+          },
+          {
+            "$ref": "#/components/schemas/ResolutionGroup"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "station": "#/components/schemas/ResolutionStation",
+            "group": "#/components/schemas/ResolutionGroup"
+          }
+        }
+      },
+      "StationArgument": {
+        "description": "A station argument and what it was understood to mean.",
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "What was asked for."
+          },
+          "resolution": {
+            "$ref": "#/components/schemas/Resolution"
+          }
+        },
+        "required": [
+          "query",
+          "resolution"
+        ],
+        "additionalProperties": false
+      },
+      "CallingPoint": {
+        "description": "A stop after this station. The time is the arrival where the stop has a public arrival, else the departure.",
+        "type": "object",
+        "properties": {
+          "station": {
+            "$ref": "#/components/schemas/Place"
+          },
+          "time": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/Platform"
+          }
+        },
+        "required": [
+          "station",
+          "time",
+          "platform"
+        ],
+        "additionalProperties": false
+      },
+      "FormationDivides": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "divides"
+          },
+          "at": {
+            "$ref": "#/components/schemas/Place"
+          }
+        },
+        "required": [
+          "type",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "FormationJoins": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "joins"
+          },
+          "at": {
+            "$ref": "#/components/schemas/Place"
+          }
+        },
+        "required": [
+          "type",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "FormationChange": {
+        "description": "The train divides, or joins another portion, later on.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/FormationDivides"
+          },
+          {
+            "$ref": "#/components/schemas/FormationJoins"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "divides": "#/components/schemas/FormationDivides",
+            "joins": "#/components/schemas/FormationJoins"
+          }
+        }
+      },
+      "FormedFrom": {
+        "description": "The inbound train that physically becomes this one. If it is late, this usually is too.",
+        "type": "object",
+        "properties": {
+          "headcode": {
+            "type": "string"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Place"
+          },
+          "expected_arrival": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the inbound is expected here. null when there is no time for it."
+          }
+        },
+        "required": [
+          "headcode",
+          "origin",
+          "expected_arrival"
+        ],
+        "additionalProperties": false
+      },
+      "Departure": {
+        "type": "object",
+        "properties": {
+          "train": {
+            "$ref": "#/components/schemas/Train"
+          },
+          "service_class": {
+            "$ref": "#/components/schemas/ServiceClass"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Place"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/Place"
+          },
+          "departs": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/Platform"
+          },
+          "calling_points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CallingPoint"
+            }
+          },
+          "destination_arrival": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Booked arrival at its destination. null when the timetable has none."
+          },
+          "coaches": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Coaches in the formation here, from Darwin. null when Darwin has not said."
+          },
+          "formation_changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormationChange"
+            }
+          },
+          "formed_from": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FormedFrom"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "delay_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Darwin's reason for lateness. null when it has given none."
+          },
+          "advertised": {
+            "type": "boolean",
+            "description": "false when Darwin asks that this call not be shown on boards."
+          }
+        },
+        "required": [
+          "train",
+          "service_class",
+          "origin",
+          "destination",
+          "departs",
+          "platform",
+          "calling_points",
+          "destination_arrival",
+          "coaches",
+          "formation_changes",
+          "formed_from",
+          "delay_reason",
+          "advertised"
+        ],
+        "additionalProperties": false
+      },
+      "DeparturesRequest": {
+        "type": "object",
+        "properties": {
+          "station": {
+            "$ref": "#/components/schemas/StationArgument"
+          },
+          "calling_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StationArgument"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "from_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$",
+            "description": "HH:MM, UK local. null when not given."
+          },
+          "to_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$",
+            "description": "HH:MM, UK local. null when not given."
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "station",
+          "calling_at",
+          "from_time",
+          "to_time",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "Leg": {
+        "description": "One train, boarded at from and left at to. from is null only when the journey was asked from a group of stations and the itinerary does not say which one it leaves from.",
+        "type": "object",
+        "properties": {
+          "train": {
+            "$ref": "#/components/schemas/Train"
+          },
+          "service_class": {
+            "$ref": "#/components/schemas/ServiceClass"
+          },
+          "from": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departs": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "departure_platform": {
+            "$ref": "#/components/schemas/Platform"
+          },
+          "to": {
+            "$ref": "#/components/schemas/Place"
+          },
+          "arrives": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "arrival_platform": {
+            "$ref": "#/components/schemas/Platform"
+          },
+          "coaches": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Coaches, where Darwin says. null otherwise."
+          }
+        },
+        "required": [
+          "train",
+          "service_class",
+          "from",
+          "departs",
+          "departure_platform",
+          "to",
+          "arrives",
+          "arrival_platform",
+          "coaches"
+        ],
+        "additionalProperties": false
+      },
+      "Connection": {
+        "description": "The change between two legs.",
+        "type": "object",
+        "properties": {
+          "at": {
+            "$ref": "#/components/schemas/Place"
+          },
+          "minutes": {
+            "type": "integer",
+            "description": "Timetabled minutes between arriving and leaving."
+          },
+          "outlook": {
+            "type": "string",
+            "enum": [
+              "safe",
+              "at_risk",
+              "unknown"
+            ],
+            "description": "at_risk: live running leaves less than the minimum interchange. unknown: one side is late with no estimate."
+          }
+        },
+        "required": [
+          "at",
+          "minutes",
+          "outlook"
+        ],
+        "additionalProperties": false
+      },
+      "JourneyDirect": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "direct"
+          },
+          "departs": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "arrives": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "duration_minutes": {
+            "type": "integer"
+          },
+          "leg": {
+            "$ref": "#/components/schemas/Leg"
+          }
+        },
+        "required": [
+          "type",
+          "departs",
+          "arrives",
+          "duration_minutes",
+          "leg"
+        ],
+        "additionalProperties": false
+      },
+      "JourneyWithChanges": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "with_changes"
+          },
+          "departs": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "arrives": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "duration_minutes": {
+            "type": "integer"
+          },
+          "legs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Leg"
+            }
+          },
+          "connections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Connection"
+            },
+            "description": "connections[i] is the change from legs[i] to legs[i + 1]."
+          }
+        },
+        "required": [
+          "type",
+          "departs",
+          "arrives",
+          "duration_minutes",
+          "legs",
+          "connections"
+        ],
+        "additionalProperties": false
+      },
+      "Journey": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/JourneyDirect"
+          },
+          {
+            "$ref": "#/components/schemas/JourneyWithChanges"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "direct": "#/components/schemas/JourneyDirect",
+            "with_changes": "#/components/schemas/JourneyWithChanges"
+          }
+        }
+      },
+      "JourneyRequest": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/StationArgument"
+          },
+          "to": {
+            "$ref": "#/components/schemas/StationArgument"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "max_changes": {
+            "type": "integer"
+          },
+          "min_interchange_min": {
+            "type": "integer"
+          },
+          "from_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$",
+            "description": "HH:MM, UK local. null when not given."
+          },
+          "to_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$",
+            "description": "HH:MM, UK local. null when not given."
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "limit",
+          "max_changes",
+          "min_interchange_min",
+          "from_time",
+          "to_time"
+        ],
+        "additionalProperties": false
+      },
+      "Report": {
+        "description": "A TRUST movement report. location is null when the report's location is not in our location data.",
+        "type": "object",
+        "properties": {
+          "location": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00."
+          },
+          "event": {
+            "type": "string",
+            "enum": [
+              "arrival",
+              "departure"
+            ],
+            "description": "TRUST reports a pass as a departure."
+          },
+          "delay_minutes": {
+            "type": "integer",
+            "description": "Negative is early."
+          },
+          "off_route": {
+            "type": "boolean",
+            "description": "Reported somewhere its schedule does not go."
+          },
+          "platform": {
+            "$ref": "#/components/schemas/Platform"
+          }
+        },
+        "required": [
+          "location",
+          "at",
+          "event",
+          "delay_minutes",
+          "off_route",
+          "platform"
+        ],
+        "additionalProperties": false
+      },
+      "ProgressNotStarted": {
+        "description": "In today's timetable, with no movement reports yet.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "not_started"
+          },
+          "activated": {
+            "type": "boolean",
+            "description": "TRUST has activated it: it is expected to run."
+          },
+          "departs": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Booked departure from its origin."
+          },
+          "arrives": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Booked arrival at its destination."
+          }
+        },
+        "required": [
+          "type",
+          "activated",
+          "departs",
+          "arrives"
+        ],
+        "additionalProperties": false
+      },
+      "ProgressRunning": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "running"
+          },
+          "last_report": {
+            "$ref": "#/components/schemas/Report"
+          }
+        },
+        "required": [
+          "type",
+          "last_report"
+        ],
+        "additionalProperties": false
+      },
+      "ProgressFinished": {
+        "description": "Arrived at its destination.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "finished"
+          },
+          "last_report": {
+            "$ref": "#/components/schemas/Report"
+          }
+        },
+        "required": [
+          "type",
+          "last_report"
+        ],
+        "additionalProperties": false
+      },
+      "Progress": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ProgressNotStarted"
+          },
+          {
+            "$ref": "#/components/schemas/ProgressRunning"
+          },
+          {
+            "$ref": "#/components/schemas/ProgressFinished"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "not_started": "#/components/schemas/ProgressNotStarted",
+            "running": "#/components/schemas/ProgressRunning",
+            "finished": "#/components/schemas/ProgressFinished"
+          }
+        }
+      },
+      "TrainRun": {
+        "description": "One run of a train. origin and destination are null when no schedule matched the run.",
+        "type": "object",
+        "properties": {
+          "train": {
+            "$ref": "#/components/schemas/Train"
+          },
+          "run_date": {
+            "type": "string",
+            "format": "date",
+            "description": "YYYY-MM-DD"
+          },
+          "origin": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destination": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "progress": {
+            "$ref": "#/components/schemas/Progress"
+          }
+        },
+        "required": [
+          "train",
+          "run_date",
+          "origin",
+          "destination",
+          "progress"
+        ],
+        "additionalProperties": false
+      },
+      "TrainRequest": {
+        "type": "object",
+        "properties": {
+          "headcode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "train_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          }
+        },
+        "required": [
+          "headcode",
+          "train_id",
+          "operator",
+          "origin",
+          "destination",
+          "date"
+        ],
+        "additionalProperties": false
+      },
+      "LastSeen": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00."
+          }
+        },
+        "required": [
+          "location",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "DelayedTrain": {
+        "type": "object",
+        "properties": {
+          "train": {
+            "$ref": "#/components/schemas/Train"
+          },
+          "service_class": {
+            "$ref": "#/components/schemas/ServiceClass"
+          },
+          "origin": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destination": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "delay_minutes": {
+            "type": "integer"
+          },
+          "off_route": {
+            "type": "boolean"
+          },
+          "last_seen": {
+            "$ref": "#/components/schemas/LastSeen"
+          }
+        },
+        "required": [
+          "train",
+          "service_class",
+          "origin",
+          "destination",
+          "delay_minutes",
+          "off_route",
+          "last_seen"
+        ],
+        "additionalProperties": false
+      },
+      "DelaysRequest": {
+        "type": "object",
+        "properties": {
+          "min_minutes": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "passenger_only": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "min_minutes",
+          "limit",
+          "passenger_only"
+        ],
+        "additionalProperties": false
+      },
+      "CancellationReason": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Delay Attribution code, e.g. TG."
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "planned": {
+            "type": "boolean",
+            "description": "A planned reduction (engineering work and the like) rather than something going wrong."
+          }
+        },
+        "required": [
+          "code",
+          "description",
+          "category",
+          "planned"
+        ],
+        "additionalProperties": false
+      },
+      "CancelledBeforeDeparture": {
+        "description": "Cancelled at its origin, before it started (TRUST: AT ORIGIN).",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "before_departure"
+          },
+          "at": {
+            "$ref": "#/components/schemas/Place"
+          }
+        },
+        "required": [
+          "type",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "CancelledPartWay": {
+        "description": "Started, and was cancelled from here on (TRUST: EN ROUTE).",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "part_way"
+          },
+          "at": {
+            "$ref": "#/components/schemas/Place"
+          }
+        },
+        "required": [
+          "type",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "CancelledNotNeeded": {
+        "description": "A schedule that only runs when called upon, and was not needed (TRUST: ON CALL).",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "not_needed"
+          },
+          "at": {
+            "$ref": "#/components/schemas/Place"
+          }
+        },
+        "required": [
+          "type",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "CancelledOffBookedPath": {
+        "description": "Cancelled while running somewhere its schedule does not go (TRUST: OUT OF PLAN).",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "off_booked_path"
+          },
+          "at": {
+            "$ref": "#/components/schemas/Place"
+          }
+        },
+        "required": [
+          "type",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "CancellationKind": {
+        "description": "Where in its run the train was cancelled, and where that was.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/CancelledBeforeDeparture"
+          },
+          {
+            "$ref": "#/components/schemas/CancelledPartWay"
+          },
+          {
+            "$ref": "#/components/schemas/CancelledNotNeeded"
+          },
+          {
+            "$ref": "#/components/schemas/CancelledOffBookedPath"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "before_departure": "#/components/schemas/CancelledBeforeDeparture",
+            "part_way": "#/components/schemas/CancelledPartWay",
+            "not_needed": "#/components/schemas/CancelledNotNeeded",
+            "off_booked_path": "#/components/schemas/CancelledOffBookedPath"
+          }
+        }
+      },
+      "Cancellation": {
+        "description": "origin, destination, train.uid and train.operator are null when TRUST cancelled a train before activating it, so its schedule is unknown; service_class is then unknown.",
+        "type": "object",
+        "properties": {
+          "train": {
+            "$ref": "#/components/schemas/Train"
+          },
+          "service_class": {
+            "$ref": "#/components/schemas/ServiceClass"
+          },
+          "origin": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destination": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cancelled": {
+            "$ref": "#/components/schemas/CancellationKind"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/CancellationReason"
+          },
+          "reported_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When we received it."
+          },
+          "keyed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was entered into TRUST. Can be hours before, for a cancellation planned ahead."
+          }
+        },
+        "required": [
+          "train",
+          "service_class",
+          "origin",
+          "destination",
+          "cancelled",
+          "reason",
+          "reported_at",
+          "keyed_at"
+        ],
+        "additionalProperties": false
+      },
+      "CancellationsRequest": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer"
+          },
+          "passenger_only": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "limit",
+          "passenger_only"
+        ],
+        "additionalProperties": false
+      },
+      "Movement": {
+        "description": "A movement TRUST reported at the station.",
+        "type": "object",
+        "properties": {
+          "train": {
+            "$ref": "#/components/schemas/TrainRef"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Place"
+          },
+          "event": {
+            "type": "string",
+            "enum": [
+              "arrival",
+              "departure"
+            ]
+          },
+          "time": {
+            "$ref": "#/components/schemas/Time"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/Platform"
+          },
+          "off_route": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "train",
+          "location",
+          "event",
+          "time",
+          "platform",
+          "off_route"
+        ],
+        "additionalProperties": false
+      },
+      "ActivityRequest": {
+        "type": "object",
+        "properties": {
+          "station": {
+            "$ref": "#/components/schemas/StationArgument"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "station",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "StationMatchStation": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "station"
+          },
+          "crs": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tiploc": {
+            "type": "string"
+          },
+          "stanox": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "calls_today": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type",
+          "crs",
+          "name",
+          "tiploc",
+          "stanox",
+          "calls_today"
+        ],
+        "additionalProperties": false
+      },
+      "StationMatchLocation": {
+        "description": "Somewhere that is not a public station.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "location"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "depot",
+              "infrastructure",
+              "other"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "crs": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Some depots and sidings carry an operational code."
+          },
+          "tiploc": {
+            "type": "string"
+          },
+          "stanox": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "calls_today": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type",
+          "kind",
+          "name",
+          "crs",
+          "tiploc",
+          "stanox",
+          "calls_today"
+        ],
+        "additionalProperties": false
+      },
+      "StationMatch": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/StationMatchStation"
+          },
+          {
+            "$ref": "#/components/schemas/StationMatchLocation"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "station": "#/components/schemas/StationMatchStation",
+            "location": "#/components/schemas/StationMatchLocation"
+          }
+        }
+      },
+      "StationSearch": {
+        "description": "resolves_to is the group, alias or landmark the query itself names, or null.",
+        "type": "object",
+        "properties": {
+          "resolves_to": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Resolution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StationMatch"
+            }
+          },
+          "near_misses": {
+            "type": "boolean",
+            "description": "true when nothing matched as written and these are the closest names."
+          }
+        },
+        "required": [
+          "resolves_to",
+          "matches",
+          "near_misses"
+        ],
+        "additionalProperties": false
+      },
+      "StationsRequest": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "The query as searched."
+          }
+        },
+        "required": [
+          "q"
+        ],
+        "additionalProperties": false
+      },
+      "Summary": {
+        "type": "object",
+        "properties": {
+          "service_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "scheduled": {
+            "type": "integer",
+            "description": "Runs in today's timetable."
+          },
+          "started": {
+            "type": "integer",
+            "description": "Of those, activated so far."
+          },
+          "running_now": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer"
+              },
+              "window_minutes": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "count",
+              "window_minutes"
+            ],
+            "additionalProperties": false
+          },
+          "cancelled": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "planned": {
+                "type": "integer",
+                "description": "Withdrawn by the timetable itself."
+              }
+            },
+            "required": [
+              "total",
+              "planned"
+            ],
+            "additionalProperties": false
+          },
+          "punctuality": {
+            "type": "object",
+            "properties": {
+              "on_time_percent": {
+                "type": "number"
+              },
+              "definition": {
+                "type": "string"
+              },
+              "average_lateness_minutes": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "on_time_percent",
+              "definition",
+              "average_lateness_minutes"
+            ],
+            "additionalProperties": false
+          },
+          "movement_reports_today": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "service_date",
+          "scheduled",
+          "started",
+          "running_now",
+          "cancelled",
+          "punctuality",
+          "movement_reports_today"
+        ],
+        "additionalProperties": false
+      },
+      "EmptyRequest": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "FreshnessFresh": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "fresh"
+          },
+          "last_stored_seconds_ago": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type",
+          "last_stored_seconds_ago"
+        ],
+        "additionalProperties": false
+      },
+      "FreshnessStale": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "stale"
+          },
+          "last_stored_seconds_ago": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type",
+          "last_stored_seconds_ago"
+        ],
+        "additionalProperties": false
+      },
+      "FreshnessSilent": {
+        "description": "Nothing stored in the window looked at.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "silent"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "FreshnessUnknown": {
+        "description": "The database could not be asked.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "unknown"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "Freshness": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/FreshnessFresh"
+          },
+          {
+            "$ref": "#/components/schemas/FreshnessStale"
+          },
+          {
+            "$ref": "#/components/schemas/FreshnessSilent"
+          },
+          {
+            "$ref": "#/components/schemas/FreshnessUnknown"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "fresh": "#/components/schemas/FreshnessFresh",
+            "stale": "#/components/schemas/FreshnessStale",
+            "silent": "#/components/schemas/FreshnessSilent",
+            "unknown": "#/components/schemas/FreshnessUnknown"
+          }
+        }
+      },
+      "Feed": {
+        "type": "object",
+        "properties": {
+          "stale_after_seconds": {
+            "type": "integer"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/Freshness"
+          }
+        },
+        "required": [
+          "stale_after_seconds",
+          "freshness"
+        ],
+        "additionalProperties": false
+      },
+      "TrainsRunningCounted": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "counted"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "TrainsRunningUnknown": {
+        "description": "The live map did not answer.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "unknown"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "TrainsRunning": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TrainsRunningCounted"
+          },
+          {
+            "$ref": "#/components/schemas/TrainsRunningUnknown"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "counted": "#/components/schemas/TrainsRunningCounted",
+            "unknown": "#/components/schemas/TrainsRunningUnknown"
+          }
+        }
+      },
+      "Status": {
+        "type": "object",
+        "properties": {
+          "health": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "description": "ok only when every feed is fresh."
+          },
+          "feeds": {
+            "type": "object",
+            "properties": {
+              "trust": {
+                "$ref": "#/components/schemas/Feed"
+              },
+              "td": {
+                "$ref": "#/components/schemas/Feed"
+              },
+              "darwin": {
+                "$ref": "#/components/schemas/Feed"
+              }
+            },
+            "required": [
+              "trust",
+              "td",
+              "darwin"
+            ],
+            "additionalProperties": false
+          },
+          "trains_running": {
+            "$ref": "#/components/schemas/TrainsRunning"
+          },
+          "measured_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00."
+          }
+        },
+        "required": [
+          "health",
+          "feeds",
+          "trains_running",
+          "measured_at"
+        ],
+        "additionalProperties": false
+      },
+      "IndexEndpoint": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "query": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "query",
+          "description"
+        ],
+        "additionalProperties": false
+      },
+      "Index": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "openapi": {
+            "type": "string",
+            "format": "uri"
+          },
+          "docs": {
+            "type": "string",
+            "format": "uri"
+          },
+          "mcp": {
+            "type": "string",
+            "format": "uri"
+          },
+          "endpoints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexEndpoint"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "openapi",
+          "docs",
+          "mcp",
+          "endpoints"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorStationNotFound": {
+        "description": "HTTP 404.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "station_not_found"
+          },
+          "parameter": {
+            "type": "string",
+            "description": "station, from, to or calling_at."
+          },
+          "query": {
+            "type": "string"
+          },
+          "did_you_mean": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Station"
+            },
+            "description": "Near misses, never acted on for you. Empty when nothing came close."
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "parameter",
+          "query",
+          "did_you_mean",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorStationAmbiguous": {
+        "description": "HTTP 400.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "station_ambiguous"
+          },
+          "parameter": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Station"
+            }
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "parameter",
+          "query",
+          "candidates",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorSameStation": {
+        "description": "HTTP 400.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "same_station"
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorParameterOutOfRange": {
+        "description": "HTTP 400.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "parameter_out_of_range"
+          },
+          "parameter": {
+            "type": "string"
+          },
+          "value": {
+            "type": "integer"
+          },
+          "min": {
+            "type": "integer"
+          },
+          "max": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "parameter",
+          "value",
+          "min",
+          "max",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorInvalidParameter": {
+        "description": "HTTP 400.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "invalid_parameter"
+          },
+          "parameter": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "string",
+            "enum": [
+              "integer",
+              "boolean",
+              "time",
+              "date",
+              "headcode"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "parameter",
+          "value",
+          "expected",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorMissingParameter": {
+        "description": "HTTP 400.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "missing_parameter"
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Give at least one of these."
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "parameters",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorTrainNotFound": {
+        "description": "HTTP 404.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "train_not_found"
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorNotFound": {
+        "description": "HTTP 404: no such endpoint.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "not_found"
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorMethodNotAllowed": {
+        "description": "HTTP 405.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "method_not_allowed"
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorRateLimited": {
+        "description": "HTTP 429.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "rate_limited"
+          },
+          "retry_after_seconds": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "retry_after_seconds",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorDatabaseBusy": {
+        "description": "HTTP 503.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "database_busy"
+          },
+          "retry_after_seconds": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "retry_after_seconds",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorDatabaseUnavailable": {
+        "description": "HTTP 503.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "database_unavailable"
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorQueryFailed": {
+        "description": "HTTP 503.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "query_failed"
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorStatusUnavailable": {
+        "description": "HTTP 503.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "status_unavailable"
+          },
+          "retry_after_seconds": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "retry_after_seconds",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorInternal": {
+        "description": "HTTP 500.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "internal_error"
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ApiError": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ErrorStationNotFound"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorStationAmbiguous"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorSameStation"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorParameterOutOfRange"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorInvalidParameter"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorMissingParameter"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorTrainNotFound"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorNotFound"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorMethodNotAllowed"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorRateLimited"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorDatabaseBusy"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorDatabaseUnavailable"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorQueryFailed"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorStatusUnavailable"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorInternal"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "station_not_found": "#/components/schemas/ErrorStationNotFound",
+            "station_ambiguous": "#/components/schemas/ErrorStationAmbiguous",
+            "same_station": "#/components/schemas/ErrorSameStation",
+            "parameter_out_of_range": "#/components/schemas/ErrorParameterOutOfRange",
+            "invalid_parameter": "#/components/schemas/ErrorInvalidParameter",
+            "missing_parameter": "#/components/schemas/ErrorMissingParameter",
+            "train_not_found": "#/components/schemas/ErrorTrainNotFound",
+            "not_found": "#/components/schemas/ErrorNotFound",
+            "method_not_allowed": "#/components/schemas/ErrorMethodNotAllowed",
+            "rate_limited": "#/components/schemas/ErrorRateLimited",
+            "database_busy": "#/components/schemas/ErrorDatabaseBusy",
+            "database_unavailable": "#/components/schemas/ErrorDatabaseUnavailable",
+            "query_failed": "#/components/schemas/ErrorQueryFailed",
+            "status_unavailable": "#/components/schemas/ErrorStatusUnavailable",
+            "internal_error": "#/components/schemas/ErrorInternal"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "error"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ApiError"
+          }
+        },
+        "required": [
+          "type",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "DeparturesResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "ok"
+          },
+          "request": {
+            "$ref": "#/components/schemas/DeparturesRequest"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Departure"
+            }
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the database answered."
+          }
+        },
+        "required": [
+          "type",
+          "request",
+          "data",
+          "generated_at"
+        ],
+        "additionalProperties": false
+      },
+      "JourneyResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "ok"
+          },
+          "request": {
+            "$ref": "#/components/schemas/JourneyRequest"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Journey"
+            }
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the database answered."
+          }
+        },
+        "required": [
+          "type",
+          "request",
+          "data",
+          "generated_at"
+        ],
+        "additionalProperties": false
+      },
+      "TrainResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "ok"
+          },
+          "request": {
+            "$ref": "#/components/schemas/TrainRequest"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrainRun"
+            }
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the database answered."
+          }
+        },
+        "required": [
+          "type",
+          "request",
+          "data",
+          "generated_at"
+        ],
+        "additionalProperties": false
+      },
+      "DelaysResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "ok"
+          },
+          "request": {
+            "$ref": "#/components/schemas/DelaysRequest"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DelayedTrain"
+            }
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the database answered."
+          }
+        },
+        "required": [
+          "type",
+          "request",
+          "data",
+          "generated_at"
+        ],
+        "additionalProperties": false
+      },
+      "CancellationsResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "ok"
+          },
+          "request": {
+            "$ref": "#/components/schemas/CancellationsRequest"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Cancellation"
+            }
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the database answered."
+          }
+        },
+        "required": [
+          "type",
+          "request",
+          "data",
+          "generated_at"
+        ],
+        "additionalProperties": false
+      },
+      "SummaryResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "ok"
+          },
+          "request": {
+            "$ref": "#/components/schemas/EmptyRequest"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the database answered."
+          }
+        },
+        "required": [
+          "type",
+          "request",
+          "data",
+          "generated_at"
+        ],
+        "additionalProperties": false
+      },
+      "StationsResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "ok"
+          },
+          "request": {
+            "$ref": "#/components/schemas/StationsRequest"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StationSearch"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the database answered."
+          }
+        },
+        "required": [
+          "type",
+          "request",
+          "data",
+          "generated_at"
+        ],
+        "additionalProperties": false
+      },
+      "ActivityResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "ok"
+          },
+          "request": {
+            "$ref": "#/components/schemas/ActivityRequest"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Movement"
+            }
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the database answered."
+          }
+        },
+        "required": [
+          "type",
+          "request",
+          "data",
+          "generated_at"
+        ],
+        "additionalProperties": false
+      },
+      "StatusResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "ok"
+          },
+          "request": {
+            "$ref": "#/components/schemas/EmptyRequest"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the database answered."
+          }
+        },
+        "required": [
+          "type",
+          "request",
+          "data",
+          "generated_at"
+        ],
+        "additionalProperties": false
+      },
+      "IndexResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "ok"
+          },
+          "request": {
+            "$ref": "#/components/schemas/EmptyRequest"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Index"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the database answered."
+          }
+        },
+        "required": [
+          "type",
+          "request",
+          "data",
+          "generated_at"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

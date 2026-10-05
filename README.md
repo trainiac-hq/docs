@@ -2,8 +2,8 @@
   <img src=".github/banner.png" alt="Trainiac: docs for the Trainiac API and MCP server" width="100%">
 </p>
 
-Live UK train data, free, as plain JSON. Ask for a station's departures, plan
-a journey, find where a train is right now, or see today's delays and
+Live UK train data, free, as typed JSON. Ask for a station's departures,
+plan a journey, find where a train is right now, or see today's delays and
 cancellations. It's all built from Network Rail's open feeds and National
 Rail's Darwin forecasts.
 
@@ -11,109 +11,128 @@ No sign-up, no API keys. Everything is a `GET`, and it works straight from a
 browser (CORS is open).
 
 ```sh
-curl 'https://api.traini.ac/api/departures/PAD?limit=5'   # next trains from Paddington
-curl 'https://api.traini.ac/api/journey/PAD/RDG'          # Paddington to Reading
-curl 'https://api.traini.ac/api/train?headcode=1A23'      # where is 1A23?
+curl 'https://api.traini.ac/v1/departures/PAD?limit=5'   # next trains from Paddington
+curl 'https://api.traini.ac/v1/journey/PAD/RDG'          # Paddington to Reading
+curl 'https://api.traini.ac/v1/train?headcode=1A23'      # where is 1A23?
 ```
+
+**Writing TypeScript?** Every answer has a published type. Copy
+[`v1.d.ts`](v1.d.ts), or generate your own from
+[`openapi.v1.json`](openapi.v1.json) (OpenAPI 3.1).
 
 **Using it with an AI?** The same data is an [MCP server](#use-it-from-an-ai-mcp).
 In Claude Code it's one line:
 `claude mcp add --transport http trainiac https://api.traini.ac/mcp`
 
+**Coming from `/api`?** It's [legacy](#legacy-api) and will go away.
+[MIGRATING.md](MIGRATING.md) maps every field to its `/v1` home.
+
 ## What you can ask
 
-Base URL: `https://api.traini.ac`. `GET /api` lists everything as JSON.
+Base URL: `https://api.traini.ac`. `GET /v1` lists everything as JSON.
 
 | Ask for | Endpoint |
 | --- | --- |
-| The departure board at a station | [`/api/departures/{station}`](#departures) |
-| Trains from A to B, with changes | [`/api/journey/{from}/{to}`](#journey) |
-| Where one train is right now | [`/api/train?headcode=…`](#train) |
-| A station's code from its name | [`/api/stations?q=…`](#station-search) |
-| What actually ran at a station in the last 3 hours | [`/api/stations/{station}/activity`](#station-activity) |
-| The worst delays right now | [`/api/delays`](#delays) |
-| Today's cancellations, with reasons | [`/api/cancellations`](#cancellations) |
-| Today's headline numbers | [`/api/summary`](#summary) |
-| Every train on a map | [`/api/positions`](#positions) |
-| Whether the data is fresh right now | [`/api/status`](#status) |
+| The departure board at a station | [`/v1/departures/{station}`](#departures) |
+| Trains from A to B, with changes | [`/v1/journey/{from}/{to}`](#journey) |
+| Where one train is right now | [`/v1/train?headcode=…`](#train) |
+| A station's code from its name | [`/v1/stations?q=…`](#station-search) |
+| What actually ran at a station in the last 3 hours | [`/v1/stations/{station}/activity`](#station-activity) |
+| The worst delays right now | [`/v1/delays`](#delays) |
+| Today's cancellations, with reasons | [`/v1/cancellations`](#cancellations) |
+| Today's headline numbers | [`/v1/summary`](#summary) |
+| Whether the data is fresh right now | [`/v1/status`](#status) |
 
-### Five things worth knowing
+### Four things worth knowing
 
-1. **Stations can be written however you like:** a code (`PAD`), a name
-   (`London Paddington`, percent-encoded in a path) or a group (`London`
-   means all the London terminals). More in [Stations](#stations).
-2. **Times are UK time, with the offset**, like `2026-08-17T03:35:00+01:00`.
-   When you send a time, use `HH:MM`. Dates are `YYYY-MM-DD`.
-3. **`null` means "we don't know yet"**, not "on time". Delays are in
+1. **Switch on `type`.** Every answer, and every value that can be one of
+   several things, says which it is in a `type` field. TypeScript narrows
+   on it.
+2. **Every key is always there.** `null` means the thing doesn't exist (a
+   train that hasn't been given an id yet), never "we don't know": not
+   knowing is its own `type`, like `{"type": "no_information"}`.
+3. **Stations can be written however you like:** a code (`PAD`), a name
+   (`London Paddington`, percent-encoded in a path) or a group (`London`).
+   Answers always use proper names: London Paddington, not PADDINGTON LONDON.
+4. **Times are UK time, with the offset**, like `2026-10-05T14:26:00+01:00`.
+   When you send a time, use `HH:MM`. Dates are `YYYY-MM-DD`. Delays are in
    minutes, and negative means early.
-4. **Show `status_text`, branch on `status`.** Every train has both: a
-   sentence for people, and a stable code for your code.
-5. **Every live value says where it came from** (`data_source`): a Darwin
-   forecast, a live report from the train, or just the timetable.
 
 ## Every answer looks the same
 
-Everything except `/api/positions` comes back in one envelope:
+```ts
+type Answer<Request, Data> =
+  | { type: "ok"; request: Request; data: Data; generated_at: string } // HTTP 200
+  | { type: "error"; error: ApiError };                                 // HTTP 4xx/5xx
+```
+
+`request` is what we took your arguments to mean, with defaults filled in.
+Check it: a name becomes one specific station (or a group), and this is
+where you see which.
 
 ```json
-{
-  "generated_at": "2026-08-17T03:36:57+01:00",
-  "resolved": { "station": { "name": "PADDINGTON LONDON", "crs": "PAD" } },
-  "results": [ … ],
-  "result_count": 2
+"request": {
+  "station": { "query": "London", "resolution": { "type": "group", "name": "London Terminals",
+    "stations": [ { "crs": "PAD", "name": "London Paddington" }, { "crs": "KGX", "name": "London Kings Cross" }, … ] } },
+  "calling_at": null, "from_time": null, "to_time": null, "limit": 15
 }
 ```
 
-- `resolved` is what we took your arguments to mean. Check it: a name
-  becomes one specific station, and this is where you see which one.
-- `results` can be empty. Empty means "no trains". A station we couldn't
-  work out is an error, never an empty list.
+`data` can be an empty list. Empty means "no trains". A station we couldn't
+work out is an error, never an empty list.
 
-<details>
-<summary><b>Statuses, sources and platforms in detail</b></summary>
+## The building blocks
 
-<br>
+These appear all over. The full set, with every endpoint's request and
+data, is [`v1.d.ts`](v1.d.ts).
 
-| `status` | `status_text` |
-| --- | --- |
-| `on_time` | On time |
-| `expected_late` | Expected 03:36 |
-| `delayed_no_estimate` | Delayed, no estimate yet |
-| `cancelled` | Cancelled |
-| `departed` | Departed 03:36 |
-| `scheduled` | Scheduled, no live report yet |
-| `scheduled_arrival_forecast_only` | Scheduled, forecast covers the arrival only |
+```ts
+type Station = { crs: string; name: string };
 
-`data_source` and `platform_source` are one of:
+/** Somewhere a train is or calls. Junctions and sidings have no code. */
+type Place =
+  | { type: "station"; crs: string; name: string }
+  | { type: "location"; name: string };
 
-| Source | Meaning |
-| --- | --- |
-| `darwin forecast` | National Rail's prediction engine. The best source before a train leaves: it knows about advance delays and "delayed, no estimate". |
-| `live report` | A TRUST movement report. Reliable, but only exists once the train is running. |
-| `timetable` | Planned only. Nothing live is known. |
+type Operator = { code: string; name: string | null }; // { "code": "GW", "name": "Great Western Railway" }
 
-The best one always wins: Darwin, then TRUST, then the timetable.
-`lateness_minutes` is always the raw TRUST delay, even when Darwin's
-forecast is the one shown.
+type ServiceClass = "passenger" | "bus" | "freight" | "ship" | "trip" | "empty_stock" | "unknown";
 
-Platforms come as three fields: `platform`, `platform_source` and
-`platform_withheld`. `withheld: true` means the operator asked for it not
-to be shown on station boards. We tell you anyway, so you can decide. In
-journeys the same three appear with a prefix (`origin_platform`,
-`interchange_arrival_platform`, …).
+/** A timetabled time and what is known about it. */
+type Time = {
+  scheduled: string;
+  estimate: Estimate;
+  delay_minutes: number | null; // when the estimate has a time; negative is early
+};
 
-`service_class` is `passenger`, `bus`, `freight`, `ship`, `trip`,
-`empty stock` or `unknown`.
+type Estimate =
+  | { type: "actual"; at: string }                                      // it has happened
+  | { type: "forecast"; at: string; source: "darwin" | "live_report" }  // expected then
+  | { type: "delayed_no_estimate" }                                     // late, nobody can say how late
+  | { type: "no_information" }                                          // nothing live yet: not "on time"
+  | { type: "cancelled" };                                              // won't happen
 
-Booleans in the query are `true`/`false` (or `1`/`0`). An empty query
-parameter is the same as leaving it out. Anything but `GET` is a 405.
+type Platform =
+  | { type: "known"; number: string; source: "actual" | "forecast" | "timetable" } // "4A" is a platform
+  | { type: "withheld" }                                                           // not to be shown yet
+  | { type: "unknown" };
 
-</details>
+type Train = {
+  id: string | null;      // TRUST id, e.g. 671L50MK02. null until the train is activated
+  uid: string | null;     // timetable uid, e.g. GW001
+  headcode: string;       // e.g. 1L50. These repeat across the country
+  operator: Operator | null;
+};
+```
+
+A `forecast` from `darwin` is National Rail's prediction, the best there is
+before a train leaves. One from `live_report` is the delay the train last
+reported, carried forward. A `timetable` platform is planned only, and
+often wrong at big stations.
 
 ## Stations
 
-Anywhere you give a station (in a path, or as `calling_at`, `origin`,
-`destination`) you can use:
+Anywhere you give a station (in a path, or as `calling_at`) you can use:
 
 - a **code**: `PAD`, `KGX`, `CDU`
 - a **name**, in any word order: `London Paddington`, `paddington`,
@@ -122,33 +141,21 @@ Anywhere you give a station (in a path, or as `calling_at`, `origin`,
 
 Exact codes win, then exact names, then the busiest match, so `Paddington`
 means the main station rather than the Elizabeth line platforms. If a name
-really is ambiguous (`bradford`), you get a list to choose from instead of
-a guess.
+really is ambiguous (`bradford`), you get a `station_ambiguous` error with
+candidates instead of a guess.
 
-<details>
-<summary><b>What <code>resolved</code> looks like for a station and a group</b></summary>
-
-<br>
-
-```json
-"resolved": { "station": { "name": "London Paddington", "crs": "PAD" } }
+```ts
+type StationArgument = { query: string; resolution: Resolution };
+type Resolution =
+  | { type: "station"; crs: string; name: string }
+  | { type: "group"; name: string; stations: Station[] };
 ```
-
-A group lists what it covered:
-
-```json
-"resolved": { "station": { "name": "London Terminals", "group": true,
-  "stations": [ { "crs": "PAD", "name": "London Paddington" },
-                { "crs": "KGX", "name": "London Kings Cross" }, … ] } }
-```
-
-</details>
 
 ## Endpoints
 
 ### Departures
 
-`GET /api/departures/{station}`. The live departure board.
+`GET /v1/departures/{station}`. The live departure board. 3 units.
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
@@ -159,81 +166,78 @@ A group lists what it covered:
 
 Late trains stay on the board until their *expected* time passes.
 
+```ts
+type Departure = {
+  train: Train;
+  service_class: ServiceClass;
+  origin: Place;
+  destination: Place;
+  departs: Time;                         // from the station you asked about
+  platform: Platform;
+  calling_points: { station: Place; time: Time; platform: Platform }[];
+  destination_arrival: string | null;    // booked arrival at its destination
+  coaches: number | null;                // from Darwin, when it says
+  formation_changes: ({ type: "divides"; at: Place } | { type: "joins"; at: Place })[];
+  formed_from: { headcode: string; origin: Place; expected_arrival: string | null } | null;
+  delay_reason: string | null;
+  advertised: boolean;                   // false: Darwin asks for this stop to be kept off boards
+};
+```
+
 <details>
-<summary><b>Example and fields</b></summary>
+<summary><b>Example</b></summary>
 
 <br>
 
 ```sh
-curl 'https://api.traini.ac/api/departures/PAD?limit=1&calling_at=RDG'
+curl 'https://api.traini.ac/v1/departures/Stroud?limit=1'
 ```
 
 ```json
 {
-  "generated_at": "2026-08-17T03:37:27+01:00",
-  "resolved": {
-    "station": { "name": "PADDINGTON LONDON", "crs": "PAD" },
-    "calling_at": { "name": "READING", "crs": "RDG" }
+  "type": "ok",
+  "request": {
+    "station": { "query": "Stroud", "resolution": { "type": "station", "crs": "STD", "name": "Stroud" } },
+    "calling_at": null, "from_time": null, "to_time": null, "limit": 1
   },
-  "results": [
+  "data": [
     {
-      "departs": "2026-08-17T03:35:00+01:00",
-      "expected_departs": "2026-08-17T03:37:00+01:00",
-      "arrives": "2026-08-17T04:24:00+01:00",
-      "formed_from": null,
-      "data_source": "darwin forecast",
-      "coaches": null,
-      "formation_changes": [],
-      "late_reason": null,
-      "headcode": "2R01",
-      "operator": "Great Western Railway",
+      "train": { "id": "671L50MK02", "uid": "GW001", "headcode": "1L50",
+                 "operator": { "code": "GW", "name": "Great Western Railway" } },
       "service_class": "passenger",
-      "origin": { "name": "PADDINGTON LONDON", "crs": "PAD" },
-      "destination": { "name": "READING", "crs": "RDG" },
+      "origin": { "type": "station", "crs": "GCR", "name": "Gloucester" },
+      "destination": { "type": "station", "crs": "PAD", "name": "London Paddington" },
+      "departs": {
+        "scheduled": "2026-10-05T13:00:00+01:00",
+        "estimate": { "type": "forecast", "at": "2026-10-05T13:05:00+01:00", "source": "darwin" },
+        "delay_minutes": 5
+      },
+      "platform": { "type": "known", "number": "1", "source": "forecast" },
       "calling_points": [
-        { "station": { "name": "EALING BROADWAY", "crs": "EAL" },
-          "scheduled": "2026-08-17T03:44:00+01:00",
-          "expected": "2026-08-17T03:44:00+01:00", "platform": "3" },
+        { "station": { "type": "station", "crs": "KEM", "name": "Kemble" },
+          "time": { "scheduled": "2026-10-05T13:13:00+01:00", "estimate": { "type": "no_information" }, "delay_minutes": null },
+          "platform": { "type": "unknown" } },
         …
       ],
-      "lateness_minutes": null,
-      "is_activated": true,
-      "not_for_display": true,
-      "train_id": "732R01M317",
-      "train_uid": "C48259",
-      "status": "expected_late",
-      "status_text": "Expected 03:37",
-      "platform": "10",
-      "platform_source": "darwin forecast",
-      "platform_withheld": true
+      "destination_arrival": "2026-10-05T14:26:00+01:00",
+      "coaches": null,
+      "formation_changes": [],
+      "formed_from": null,
+      "delay_reason": null,
+      "advertised": true
     }
   ],
-  "result_count": 1
+  "generated_at": "2026-10-05T12:00:00+01:00"
 }
 ```
-
-- `departs` / `arrives`: timetabled departure here, and arrival at the
-  destination (`null` if unknown). `expected_departs` is the best live
-  estimate.
-- `is_activated`: the train exists as a running service, not just a
-  timetable row. `train_id` is `null` until then, and once set it's the
-  exact key for [`/api/train`](#train).
-- `not_for_display`: Darwin asked for this stop to be hidden from public
-  boards. We report it rather than hide it.
-- `formed_from`: the incoming train that becomes this one, when Darwin
-  says: `{ "headcode", "origin": {name, crs}, "expected_arrival" }`.
-- `formation_changes`: where the train splits or joins today, each
-  `{ "kind": "divides" | "joins", "station": {name, crs}, "note": "…" }`.
-- `late_reason`: Darwin's reason for a delay, as a sentence.
-- `coaches`: how many coaches, from Darwin.
-- `train_uid`: the timetable's own id for the service.
 
 </details>
 
 ### Journey
 
-`GET /api/journey/{from}/{to}`. Today's trains between two stations,
-including ones with changes. Connections are checked against live delays.
+`GET /v1/journey/{from}/{to}`. Today's trains between two stations,
+including ones with changes, in departure order. Connections are checked
+against live running. 5 units, or 2 with `max_changes=0`.
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
@@ -242,208 +246,150 @@ including ones with changes. Connections are checked against live delays.
 | `min_interchange_min` | 5 | 1–60. The least time to allow for a change |
 | `from_time` / `to_time` | now / — | When to leave, UK time |
 
-Both ends can be groups. Results come in departure order, and each has a
-`changes` count that decides its shape.
+```ts
+type Journey =
+  | { type: "direct"; departs: Time; arrives: Time; duration_minutes: number; leg: Leg }
+  | { type: "with_changes"; departs: Time; arrives: Time; duration_minutes: number;
+      legs: Leg[]; connections: Connection[] }; // connections[i] joins legs[i] to legs[i + 1]
+
+type Leg = {
+  train: Train;
+  service_class: ServiceClass;
+  from: Place | null;    // null only when you asked from a group and we can't say which station
+  departs: Time;
+  departure_platform: Platform;
+  to: Place;
+  arrives: Time;
+  arrival_platform: Platform;
+  coaches: number | null;
+};
+
+type Connection = {
+  at: Place;
+  minutes: number;                          // timetabled time to change
+  outlook: "safe" | "at_risk" | "unknown";  // at_risk: live running eats into the change
+};
+```
 
 <details>
-<summary><b>Direct trains (<code>changes: 0</code>)</b></summary>
+<summary><b>Example</b></summary>
 
 <br>
-
-```sh
-curl 'https://api.traini.ac/api/journey/PAD/RDG?limit=1'
-```
 
 ```json
 {
-  "changes": 0,
-  "departs": "2026-08-17T03:35:00+01:00",
-  "expected_departs": "2026-08-17T03:36:00+01:00",
-  "arrives": "2026-08-17T04:24:00+01:00",
-  "expected_arrives": "2026-08-17T04:24:00+01:00",
-  "duration_minutes": 49,
-  "data_source": "darwin forecast",
-  "coaches": null,
-  "headcode": "2R01",
-  "operator": "Great Western Railway",
-  "service_class": "passenger",
-  "arrival_station": { "name": "READING", "crs": "RDG" },
-  "destination": { "name": "READING", "crs": "RDG" },
-  "lateness_minutes": null,
-  "is_activated": true,
-  "not_for_display": true,
-  "train_id": "732R01M317",
-  "train_uid": "C48259",
-  "status": "expected_late",
-  "status_text": "Expected 03:36",
-  "platform": "10",
-  "platform_source": "darwin forecast",
-  "platform_withheld": true
+  "type": "direct",
+  "departs": { "scheduled": "2026-10-05T13:00:00+01:00",
+               "estimate": { "type": "forecast", "at": "2026-10-05T13:05:00+01:00", "source": "darwin" },
+               "delay_minutes": 5 },
+  "arrives": { "scheduled": "2026-10-05T14:26:00+01:00",
+               "estimate": { "type": "forecast", "at": "2026-10-05T14:30:00+01:00", "source": "darwin" },
+               "delay_minutes": 4 },
+  "duration_minutes": 86,
+  "leg": {
+    "train": { "id": "671L50MK02", "uid": "GW001", "headcode": "1L50",
+               "operator": { "code": "GW", "name": "Great Western Railway" } },
+    "service_class": "passenger",
+    "from": { "type": "station", "crs": "STD", "name": "Stroud" },
+    "departs": { … },
+    "departure_platform": { "type": "known", "number": "1", "source": "forecast" },
+    "to": { "type": "station", "crs": "PAD", "name": "London Paddington" },
+    "arrives": { … },
+    "arrival_platform": { "type": "unknown" },
+    "coaches": null
+  }
 }
 ```
 
-`arrival_station` is where *you* get off. `destination` is where the
-train ends up.
-
-</details>
-
-<details>
-<summary><b>One change (<code>changes: 1</code>)</b></summary>
-
-<br>
-
-```sh
-curl 'https://api.traini.ac/api/journey/PAD/CDU?limit=1&from_time=06:00'
-```
+A journey with changes has `legs` and `connections` instead of `leg`:
 
 ```json
-{
-  "changes": 1,
-  "departs": "2026-08-17T06:00:00+01:00",
-  "expected_departs": "2026-08-17T06:00:00+01:00",
-  "arrives": "2026-08-17T08:15:00+01:00",
-  "duration_minutes": 135,
-  "arrival_station": { "name": "CAM & DURSLEY", "crs": "CDU" },
-  "interchange": { "name": "BRISTOL TEMPLE MEADS", "crs": "BRI" },
-  "interchange_arrives": "2026-08-17T07:35:00+01:00",
-  "connection_minutes": 5,
-  "connection_status": "ok",
-  "interchange_departs": "2026-08-17T07:40:00+01:00",
-  "leg1_headcode": "1C01", "leg1_operator": "Great Western Railway",
-  "leg1_service_class": "passenger", "leg1_status": "on_time",
-  "leg1_status_text": "On time", "leg1_train_id": null,
-  "leg2_headcode": "2E51", "leg2_operator": "Great Western Railway",
-  "leg2_service_class": "passenger", "leg2_status": "on_time",
-  "leg2_status_text": "On time", "leg2_train_id": null,
-  "origin_platform": "4", "origin_platform_source": "darwin forecast", "origin_platform_withheld": true,
-  "interchange_arrival_platform": "15", "interchange_arrival_platform_source": "darwin forecast", "interchange_arrival_platform_withheld": false,
-  "interchange_departure_platform": "12", "interchange_departure_platform_source": "darwin forecast", "interchange_departure_platform_withheld": true
-}
+"connections": [ { "at": { "type": "station", "crs": "SWI", "name": "Swindon" }, "minutes": 5, "outlook": "at_risk" } ]
 ```
-
-`connection_status` is `ok`, `at risk` (live delays have eaten into the
-change) or `unknown` (nothing live to go on). `connection_minutes` is the
-time you really have, after any known delay.
-
-</details>
-
-<details>
-<summary><b>Two or more changes (<code>changes: 2+</code>)</b></summary>
-
-<br>
-
-Only when `max_changes` is 2 or more. Instead of `leg1_`/`leg2_` prefixes
-you get two arrays: `interchanges` (the stations, in order) and `legs`, one
-per train, each with `board`, `alight`, `departs`, `arrives`, their
-expected times, `headcode`, `operator`, `status`, and `departure_`/
-`arrival_` platform fields. The top-level `connection_minutes` and
-`connection_status` describe the *tightest* change, which is the one that
-decides whether the trip works. Each leg has its own as well.
-
-If both ends are the same place, you get a 400:
-`origin and destination are the same`.
 
 </details>
 
 ### Train
 
-`GET /api/train?headcode=1A23` or `GET /api/train?train_id=171A23MN16`.
-Where one train is right now.
+`GET /v1/train?headcode=1A23` or `GET /v1/train?train_id=171A23MN16`.
+Where one train is right now. 1 unit.
 
 | Parameter | Meaning |
 | --- | --- |
 | `headcode` | The four-character train number, e.g. `1A23` |
-| `train_id` | The exact id from a departures or journey row. Never ambiguous |
+| `train_id` | The exact id from a departure or journey. Never ambiguous |
 | `operator`, `origin`, `destination` | Narrow a headcode down |
-| `date` | `YYYY-MM-DD` for a past run. Defaults to today |
+| `date` | `YYYY-MM-DD` for a past run. Defaults to the last 12 hours |
 
-You need `headcode` or `train_id`. Headcodes repeat across the country,
-so a headcode alone can return up to ten trains, most recently seen
-first. Use `train_id` when you have it.
+You need `headcode` or `train_id`. Headcodes repeat, so a headcode alone
+can return up to ten trains, most recently seen first.
+
+```ts
+type TrainRun = {
+  train: Train;
+  run_date: string;
+  origin: Place | null;        // null when no timetable matched (some freight)
+  destination: Place | null;
+  progress:
+    | { type: "not_started"; activated: boolean; departs: string; arrives: string | null }
+    | { type: "running"; last_report: Report }
+    | { type: "finished"; last_report: Report };
+};
+
+type Report = {
+  location: Place | null;
+  at: string;
+  event: "arrival" | "departure";   // a train passing through is reported as a departure
+  delay_minutes: number;
+  off_route: boolean;
+  platform: Platform;
+};
+```
 
 <details>
-<summary><b>A train that's moving</b></summary>
+<summary><b>Example</b></summary>
 
 <br>
 
 ```json
 {
-  "generated_at": "2026-08-17T03:37:04+01:00",
-  "resolved": {},
-  "results": [
-    {
-      "train_id": "171A23MN16",
-      "headcode": "1A23",
-      "run_date": "2026-08-16",
-      "last_location": "KING'S CROSS LONDON",
-      "last_event": "ARRIVAL",
-      "reported_platform": "6",
-      "advertised_platform": "6",
-      "platform_conflict": false,
-      "variation_status": "LATE",
-      "lateness_minutes": 84,
-      "last_seen": "2026-08-16T17:46:00+01:00",
-      "is_terminated": true,
-      "minutes_since_report": 591,
-      "origin": "BRADFORD FORSTER SQUARE",
-      "destination": "KING'S CROSS LONDON",
-      "operator": "LNER",
-      "train_uid": "C02119"
+  "train": { "id": "671L50MK02", "uid": "GW001", "headcode": "1L50",
+             "operator": { "code": "GW", "name": "Great Western Railway" } },
+  "run_date": "2026-10-05",
+  "origin": { "type": "station", "crs": "GCR", "name": "Gloucester" },
+  "destination": { "type": "station", "crs": "PAD", "name": "London Paddington" },
+  "progress": {
+    "type": "running",
+    "last_report": {
+      "location": { "type": "station", "crs": "GCR", "name": "Gloucester" },
+      "at": "2026-10-05T11:55:00+01:00", "event": "departure", "delay_minutes": 3,
+      "off_route": false, "platform": { "type": "known", "number": "2", "source": "actual" }
     }
-  ],
-  "result_count": 1
-}
-```
-
-`reported_platform` is what the train reported; `advertised_platform` is
-what the timetable or Darwin said; `platform_conflict` means they really
-disagree. `is_terminated` means it has reached its destination. `origin`,
-`destination` and `operator` can be `null` for freight.
-
-</details>
-
-<details>
-<summary><b>A train that hasn't moved yet</b></summary>
-
-<br>
-
-You get today's timetabled trains with that headcode instead (up to ten,
-earliest first), with `resolved.note` explaining why there's no position.
-Tell the two apart by `last_location` (moving) or `departs` (timetabled).
-
-```sh
-curl 'https://api.traini.ac/api/train?headcode=1C01'
-```
-
-```json
-{
-  "generated_at": "2026-08-17T03:42:58+01:00",
-  "resolved": {
-    "note": "found in today's timetable, but TRUST has no movement reports for it yet, so there is no position to give. is_activated says whether the train has entered TRUST at all."
-  },
-  "results": [
-    { "train_id": "571C01M417", "headcode": "1C01", "train_uid": "W70749",
-      "run_date": "2026-08-17", "is_activated": true,
-      "departs": "2026-08-17T04:39:00+01:00", "arrives": "2026-08-17T06:36:00+01:00",
-      "origin": { "name": "DERBY", "crs": "DBY" },
-      "destination": { "name": "ST PANCRAS LONDON", "crs": "STP" },
-      "operator": "East Midlands Railway" },
-    …
-  ],
-  "result_count": 4
+  }
 }
 ```
 
 Nothing at all (not in today's timetable, not seen in the last 12 hours)
-is a 404 with a hint.
+is a `train_not_found` error.
 
 </details>
 
 ### Station search
 
-`GET /api/stations?q=paddington`. Find a station's code. Words match in
-any order, best match first. `resolved.resolves_to` is the station the same
-words would pick in a path.
+`GET /v1/stations?q=paddington`. Find a station's code. Words match in any
+order, best match first. 1 unit.
+
+```ts
+type StationSearch = {
+  resolves_to: Resolution | null;   // the group, alias or landmark your words name, if any
+  matches: StationMatch[];
+  near_misses: boolean;             // true: nothing matched as written; these are the closest
+};
+type StationMatch =
+  | { type: "station"; crs: string; name: string; tiploc: string; stanox: string | null; calls_today: number }
+  | { type: "location"; kind: "depot" | "infrastructure" | "other"; name: string; crs: string | null;
+      tiploc: string; stanox: string | null; calls_today: number };
+```
 
 <details>
 <summary><b>Example</b></summary>
@@ -452,59 +398,77 @@ words would pick in a path.
 
 ```json
 {
-  "generated_at": "2026-08-17T03:36:58+01:00",
-  "resolved": { "resolves_to": { "name": "London Paddington", "crs": "PAD" }, "query": "paddington" },
-  "results": [
-    { "stanox": "73000", "tiploc": "PADTON",  "crs": "PAD",  "description": "PADDINGTON LONDON", "type": "station", "calls": 1804 },
-    { "stanox": "73003", "tiploc": "PADTLL",  "crs": "PDX",  "description": "PADDINGTON EL",     "type": "station", "calls": 1752 },
-    { "stanox": "73104", "tiploc": "PADTNNY", "crs": null,   "description": "PADDINGTON NEW YARD", "type": "depot", "calls": 0 },
-    …
+  "resolves_to": { "type": "station", "crs": "PAD", "name": "London Paddington" },
+  "matches": [
+    { "type": "station", "crs": "PAD", "name": "London Paddington", "tiploc": "PADTON", "stanox": "73000", "calls_today": 1804 },
+    { "type": "location", "kind": "depot", "name": "Paddington New Yard", "crs": null, "tiploc": "PADTNNY", "stanox": "73104", "calls_today": 0 }
   ],
-  "result_count": 8
+  "near_misses": false
 }
 ```
 
-`type` is `station`, `depot` or `other`. `calls` is how many trains call
-there today. `stanox` and `tiploc` are Network Rail's location codes, for
-joining with other open data.
+`stanox` and `tiploc` are Network Rail's location codes, for joining with
+other open data.
 
 </details>
 
 ### Station activity
 
-`GET /api/stations/{station}/activity?limit=15`. What actually happened
-at a station in the last three hours: real arrivals and departures, planned
-against actual, newest first.
+`GET /v1/stations/{station}/activity?limit=15`. What actually happened at a
+station in the last three hours, newest first. 1 unit.
 
-<details>
-<summary><b>Example</b></summary>
-
-<br>
-
-```json
-{
-  "generated_at": "2026-08-17T03:36:58+01:00",
-  "resolved": { "station": { "name": "PADDINGTON LONDON", "crs": "PAD" } },
-  "results": [
-    { "headcode": "2P01", "train_id": "742P01M217", "event_type": "ARRIVAL",
-      "planned": "2026-08-17T03:11:00+01:00", "actual": "2026-08-17T03:10:00+01:00",
-      "lateness_minutes": -1, "variation_status": "EARLY", "platform": "10",
-      "location": "PADDINGTON LONDON" }
-  ],
-  "result_count": 2
-}
+```ts
+type Movement = {
+  train: { id: string; headcode: string };
+  location: Place;
+  event: "arrival" | "departure";
+  time: Time;            // estimate is always { type: "actual" }
+  platform: Platform;
+  off_route: boolean;
+};
 ```
-
-`event_type` is `ARRIVAL` or `DEPARTURE`. `variation_status` is `EARLY`,
-`ON TIME`, `LATE` or `OFF ROUTE`.
-
-</details>
 
 ### Delays
 
-`GET /api/delays?min_minutes=10&limit=15&passenger_only=true`. The most
-delayed trains running right now, worst first, with where each was last
-seen. Set `passenger_only=false` to include freight and empty trains.
+`GET /v1/delays?min_minutes=10&limit=15&passenger_only=true`. The most
+delayed trains running right now, worst first. 1 unit.
+
+```ts
+type DelayedTrain = {
+  train: Train;
+  service_class: ServiceClass;
+  origin: Place | null;
+  destination: Place | null;
+  delay_minutes: number;
+  off_route: boolean;
+  last_seen: { location: Place | null; at: string };
+};
+```
+
+### Cancellations
+
+`GET /v1/cancellations?limit=15&passenger_only=false`. Today's
+cancellations, newest first, with the reason in plain English. 1 unit.
+
+```ts
+type Cancellation = {
+  train: Train;
+  service_class: ServiceClass;
+  origin: Place | null;          // null when it was cancelled before we knew its timetable
+  destination: Place | null;
+  cancelled:
+    | { type: "before_departure"; at: Place }   // never left its origin
+    | { type: "part_way"; at: Place }           // ran, then cancelled from here on
+    | { type: "not_needed"; at: Place }         // an "on call" train that wasn't called on
+    | { type: "off_booked_path"; at: Place };   // cancelled while off its booked route
+  reason: { code: string; description: string; category: string; planned: boolean };
+  reported_at: string;
+  keyed_at: string;   // when it went into the system: hours earlier for a planned one
+};
+```
+
+`reason.planned` is true for planned reductions (engineering work and the
+like), which you may want to leave out of a "what went wrong today" view.
 
 <details>
 <summary><b>Example</b></summary>
@@ -513,225 +477,123 @@ seen. Set `passenger_only=false` to include freight and empty trains.
 
 ```json
 {
-  "generated_at": "2026-08-17T03:37:03+01:00",
-  "resolved": {},
-  "results": [
-    { "headcode": "9W09", "train_id": "629W09M217", "lateness_minutes": 21,
-      "last_location": "CRICKLEWOOD", "variation_status": "LATE",
-      "last_seen": "2026-08-17T03:36:00+01:00", "service_class": "passenger",
-      "origin": "BEDFORD MIDLAND", "destination": "THREE BRIDGES", "operator": "Thameslink" }
-  ],
-  "result_count": 1
+  "train": { "id": "671L60MK02", "uid": "GW007", "headcode": "1L60",
+             "operator": { "code": "GW", "name": "Great Western Railway" } },
+  "service_class": "passenger",
+  "origin": { "type": "station", "crs": "STD", "name": "Stroud" },
+  "destination": { "type": "station", "crs": "PAD", "name": "London Paddington" },
+  "cancelled": { "type": "not_needed", "at": { "type": "station", "crs": "GCR", "name": "Gloucester" } },
+  "reason": { "code": "YI", "description": "Late arrival of booked inward stock (…)", "category": "Reactionary", "planned": false },
+  "reported_at": "2026-10-05T11:30:00+01:00",
+  "keyed_at": "2026-10-05T10:30:00+01:00"
 }
 ```
-
-</details>
-
-### Cancellations
-
-`GET /api/cancellations?limit=15`. Today's cancellations, newest first,
-with the reason in plain English.
-
-<details>
-<summary><b>Example and fields</b></summary>
-
-<br>
-
-```json
-{
-  "generated_at": "2026-08-17T03:37:04+01:00",
-  "resolved": {},
-  "results": [
-    { "headcode": "9O21", "train_id": "639O21MA17", "train_uid": "C09971",
-      "canx_type": "AT ORIGIN", "canx_reason_code": "TI",
-      "reason": "Train-crew rostering problem", "reason_category": "Passenger operator",
-      "planned": false,
-      "reported_at": "2026-08-17T03:36:09+01:00", "input_at": "2026-08-17T03:36:00+01:00",
-      "location": "ST ALBANS CITY" }
-  ],
-  "result_count": 1
-}
-```
-
-`canx_type` is `AT ORIGIN`, `ON CALL`, `EN ROUTE` or `OUT OF PLAN`.
-`planned` is true when the operator planned the cancellation in advance,
-which you may want to leave out of a "what went wrong today" view.
 
 </details>
 
 ### Summary
 
-`GET /api/summary`. One row of headline numbers for today.
-
-<details>
-<summary><b>Example</b></summary>
-
-<br>
+`GET /v1/summary`. Today's headline numbers, as one object. 1 unit.
 
 ```json
 {
-  "generated_at": "2026-08-17T03:37:04+01:00",
-  "resolved": {},
-  "results": [
-    { "service_date": "2026-08-17", "scheduled": 38444, "started": 1078,
-      "running_now": 31, "running_window_min": 30,
-      "cancelled": 325, "cancelled_planned": 186,
-      "on_time_pct": 58.0,
-      "on_time_definition": "share of public calls today whose actual was at or before the timetabled time, so to the minute, not the PPM 5/10 threshold",
-      "avg_lateness_min": 6.18, "movement_events_today": 10131 }
-  ],
-  "result_count": 1
+  "service_date": "2026-10-05",
+  "scheduled": 38444,
+  "started": 1078,
+  "running_now": { "count": 31, "window_minutes": 30 },
+  "cancelled": { "total": 325, "planned": 186 },
+  "punctuality": {
+    "on_time_percent": 58.0,
+    "definition": "share of public calls today whose actual was at or before the timetabled time, so to the minute, not the PPM 5/10 threshold",
+    "average_lateness_minutes": 6.18
+  },
+  "movement_reports_today": 10131
 }
 ```
 
-`on_time_pct` counts to the minute, so it looks much worse than the
-official figures, which allow 5 or 10 minutes. Read `on_time_definition`
-before you quote it.
-
-</details>
+`on_time_percent` counts to the minute, so it looks much worse than the
+official figures, which allow 5 or 10 minutes.
 
 ### Status
 
-`GET /api/status`. Whether the API is answering, how fresh each feed's data
-is, and how many trains are running. It's answered from a snapshot at most
-15 seconds old, so polling it is cheap: 1 unit, and it never waits for the
-database.
+`GET /v1/status`. Whether the API is answering, how fresh each feed is, and
+how many trains are running. Answered from a snapshot at most 15 seconds
+old: 1 unit, never waits for the database.
 
-<details>
-<summary><b>Example and fields</b></summary>
-
-<br>
-
-```json
-{
-  "generated_at": "2026-10-05T10:31:20+01:00",
-  "status": "ok",
-  "feeds": {
-    "trust":  { "state": "fresh", "last_stored_seconds_ago": 3,  "stale_after_seconds": 300 },
-    "td":     { "state": "fresh", "last_stored_seconds_ago": 1,  "stale_after_seconds": 300 },
-    "darwin": { "state": "fresh", "last_stored_seconds_ago": 12, "stale_after_seconds": 600 }
-  },
-  "trains_running": 2140,
-  "measured_at": "2026-10-05T10:31:09+01:00"
-}
+```ts
+type Status = {
+  health: "ok" | "degraded";   // ok only when every feed is fresh
+  feeds: { trust: Feed; td: Feed; darwin: Feed };
+  trains_running: { type: "counted"; count: number } | { type: "unknown" };
+  measured_at: string;
+};
+type Feed = {
+  stale_after_seconds: number;
+  freshness:
+    | { type: "fresh"; last_stored_seconds_ago: number }
+    | { type: "stale"; last_stored_seconds_ago: number }
+    | { type: "silent" }     // nothing for hours
+    | { type: "unknown" };   // we couldn't check
+};
 ```
-
-Not in the usual envelope: it describes the API rather than the railway.
-
-- `feeds`: TRUST (train movements), TD (signalling berth steps) and
-  Darwin (forecasts). `last_stored_seconds_ago` is how old the newest data
-  we have from that feed is.
-- `state` is `fresh` up to `stale_after_seconds`, `stale` after it,
-  `silent` when nothing has arrived for hours, and `unknown` when we
-  couldn't check.
-- `status` is `ok` when every feed is fresh, otherwise `degraded`. Answers
-  still work when degraded; they just know less about what's live.
-- `trains_running`: trains on the [live map](https://traini.ac) right now,
-  seen in the last 30 minutes. `null` if we couldn't count them.
-
-</details>
-
-### Positions
-
-`GET /api/positions`. Every train seen in the last 30 minutes that we can
-put on a map.
-
-<details>
-<summary><b>Example (an older format)</b></summary>
-
-<br>
-
-This one is different from the rest: a bare array, camelCase, `seen` in
-UK time without an offset, and empty strings or `0.0` for unknowns.
-`nextLat`/`nextLon` is the next timing point, `0.0` when unknown.
-
-```json
-[
-  { "id": "181T041217", "headcode": "1T04", "crs": "DGT", "station": "DEANSGATE",
-    "lat": 53.473961, "lon": -2.250061, "status": "LATE", "delay": 7,
-    "seen": "2026-08-17T03:38:00", "eventType": "ARRIVAL",
-    "nextLat": 0.0, "nextLon": 0.0, … },
-  …
-]
-```
-
-</details>
 
 ## When something goes wrong
 
-Errors are always JSON with an `error` field, and the HTTP status tells
-you whose problem it is:
+Errors are `{"type": "error", "error": {…}}`, and the HTTP status tells you
+whose problem it is. Switch on `error.type`; `message` is for logs.
 
-| Status | Means |
-| --- | --- |
-| **400** | Something in your request (a bad time, an ambiguous station…) |
-| **404** | Nothing there (unknown station, train or endpoint) |
-| **429** | You've used your minute's allowance. See [Fair use](#fair-use) |
-| **503** | We're busy. Wait a second and try again |
-| **500** | Our bug |
-
-<details>
-<summary><b>Every error, with examples</b></summary>
-
-<br>
-
-| Status | `error` values |
-| --- | --- |
-| **400** | `invalid_integer`, `invalid_time`, `invalid_date`, `invalid_boolean`, `missing_station`, `refused`, `station ambiguous`, `limit out of range` (and other `… out of range`), `origin and destination are the same` |
-| **404** | `not_found` (no such endpoint), `station not resolved`, `train not found` |
-| **405** | `method_not_allowed` |
-| **429** | `rate_limited` |
-| **503** | `database_busy` (retry in a second), `database_unavailable`, `query_failed`, `station_lookup_failed`, `status_unavailable` |
-| **500** | `malformed_result` |
-
-Bad arguments come with a `message`:
-
-```
-GET /api/departures/PAD?limit=abc            → 400
-{"error":"invalid_integer","message":"limit must be a whole number; got 'abc'"}
-
-GET /api/departures/PAD?from_time=25:99      → 400
-{"error":"invalid_time","message":"invalid from_time: '25:99' (use HH:MM or HHMM)"}
-
-GET /api/departures/PAD?limit=500            → 400
-{"error":"limit out of range","given":500,"min":1,"max":100}
-
-GET /api/train                               → 400
-{"error":"refused","message":"Give a headcode or a train_id."}
-
-GET /api/departures                          → 400
-{"error":"missing_station","message":"Give a station: /api/departures/{station}, e.g. /api/departures/PAD"}
+```ts
+type ApiError = { message: string } & (
+  | { type: "station_not_found"; parameter: string; query: string; did_you_mean: Station[] } // 404
+  | { type: "station_ambiguous"; parameter: string; query: string; candidates: Station[] }  // 400
+  | { type: "same_station" }                                                                // 400
+  | { type: "parameter_out_of_range"; parameter: string; value: number; min: number; max: number } // 400
+  | { type: "invalid_parameter"; parameter: string; value: string;
+      expected: "integer" | "boolean" | "time" | "date" | "headcode" }                      // 400
+  | { type: "missing_parameter"; parameters: string[] }  // 400: give at least one of these
+  | { type: "train_not_found" }                          // 404
+  | { type: "not_found" }                                // 404: no such endpoint
+  | { type: "method_not_allowed" }                       // 405
+  | { type: "rate_limited"; retry_after_seconds: number } // 429
+  | { type: "database_busy"; retry_after_seconds: number } // 503
+  | { type: "database_unavailable" }                     // 503
+  | { type: "query_failed" }                             // 503
+  | { type: "status_unavailable"; retry_after_seconds: number } // 503
+  | { type: "internal_error" }                           // 500: our bug
+);
 ```
 
-Station problems tell you where to go next:
+`parameter` is the name you used: `station`, `from`, `to` or `calling_at`
+for stations.
 
 ```
-GET /api/departures/bradford                 → 400
-{"error":"station ambiguous","query":"bradford",
- "candidates":[{"crs":"BDI","name":"BRADFORD INTERCHANGE","calls_today":504},
-               {"crs":"BDQ","name":"BRADFORD FORSTER SQUARE","calls_today":313},
-               {"crs":"BOA","name":"BRADFORD-ON-AVON","calls_today":261}, …],
- "hint":"Repeat the call with one of these CRS codes."}
+GET /v1/departures/bradford                  → 400
+{"type":"error","error":{"type":"station_ambiguous","parameter":"station","query":"bradford",
+ "candidates":[{"crs":"BDI","name":"Bradford Interchange"},{"crs":"BDQ","name":"Bradford Forster Square"}, …],
+ "message":"'bradford' (station) matches more than one station. Ask again with one of the candidates' CRS codes."}}
 
-GET /api/departures/Paddingtn                → 404
-{"error":"station not resolved","query":"Paddingtn",
- "did_you_mean":[{"crs":"PAD","name":"PADDINGTON LONDON","calls_today":1804},
-                 {"crs":"PDX","name":"PADDINGTON EL","calls_today":1752}],
- "hint":"Give a CRS code or station name; find_station lists candidates. Group names like 'London' are accepted."}
+GET /v1/departures/PAD?from_time=25:99       → 400
+{"type":"error","error":{"type":"invalid_parameter","parameter":"from_time","value":"25:99","expected":"time",
+ "message":"from_time must be a time, HH:MM or HHMM; got '25:99'."}}
 ```
-
-On `/api/journey`, station errors say which end failed:
-`origin station ambiguous`, `destination station not resolved`.
-
-</details>
 
 ## Use it from code
 
 ```ts
-const res = await fetch(`https://api.traini.ac/api/departures/${crs}?limit=10`);
-const body = await res.json();
-if (!res.ok) throw new Error(`${res.status}: ${body.error}`);
-for (const d of body.results) console.log(d.headcode, d.status_text, d.destination.name);
+import type { Answer } from "./v1"; // v1.d.ts from this repo
+
+const res = await fetch(`https://api.traini.ac/v1/departures/${crs}?limit=10`);
+const body = (await res.json()) as Answer<"/v1/departures/{station}">;
+if (body.type === "error") throw new Error(`${body.error.type}: ${body.error.message}`);
+
+for (const d of body.data) {
+  const when =
+    d.departs.estimate.type === "forecast" ? `exp ${d.departs.estimate.at.slice(11, 16)}`
+    : d.departs.estimate.type === "cancelled" ? "cancelled"
+    : d.departs.estimate.type === "delayed_no_estimate" ? "delayed"
+    : "";
+  console.log(d.departs.scheduled.slice(11, 16), d.destination.name, when);
+}
 ```
 
 Percent-encode station names in paths (`encodeURIComponent`,
@@ -739,7 +601,7 @@ Percent-encode station names in paths (`encodeURIComponent`,
 [`examples/`](examples/):
 
 - [`next-train.sh`](examples/next-train.sh): curl and jq, the next train from A to B
-- [`departures.ts`](examples/departures.ts): a departure board in your terminal (Bun)
+- [`departures.ts`](examples/departures.ts): a departure board in your terminal (Bun), typed with `v1.d.ts`
 - [`journey.py`](examples/journey.py): plan a journey and warn about tight changes (Python, no dependencies)
 
 ## Use it from an AI (MCP)
@@ -759,25 +621,10 @@ server at `https://api.traini.ac/mcp`, so assistants like Claude can answer
 - **Any other MCP client**: add a remote server over Streamable HTTP at the
   same URL. There's no key and no sign-in.
 
-The tools match the endpoints one to one: `departures`, `find_station`,
-`station_activity`, `journey`, `train`, `delays`, `cancellations` and
-`live_summary`. A REST answer is exactly the MCP tool's text, so anything
-here applies to both.
-
-<details>
-<summary><b>Protocol details</b></summary>
-
-<br>
-
-Stateless Streamable HTTP, spec revision 2026-07-28. Anything that isn't
-an MCP client should use the REST endpoints.
-
-</details>
-
 ## Fair use
 
-It's free, and the limits are generous and the same for everyone. They
-count **units of work**, not requests:
+It's free, and the limits are the same for everyone. They count **units of
+work**, not requests, across `/v1`, `/api` and `/mcp` together:
 
 | Request | Units |
 | --- | --- |
@@ -787,55 +634,34 @@ count **units of work**, not requests:
 | Everything else | 1 |
 
 - **120 units a minute per address** (about 40 departure boards). Go over
-  and you get a **429** with `Retry-After`.
+  and you get a **429** `rate_limited` with `Retry-After`.
 - **20 units running at once across everyone.** If the database is busy, a
-  request waits up to two seconds, then gets a **503** with `Retry-After: 1`.
+  request waits up to two seconds, then gets a **503** `database_busy` with
+  `Retry-After: 1`.
 
 Every answer tells you where you stand, in headers a browser can read too:
-
-| Header | Means |
-| --- | --- |
-| `X-Request-Units` | What this request cost |
-| `RateLimit-Limit` | Your allowance a minute: `120` |
-| `RateLimit-Remaining` | Units left after this request |
-| `RateLimit-Reset` | Seconds until what you've spent starts coming back |
-| `RateLimit-Policy` | The same, in one line: `120;w=60` |
+`X-Request-Units` (what this cost), `RateLimit-Limit`, `RateLimit-Remaining`,
+`RateLimit-Reset` and `RateLimit-Policy` (`120;w=60`).
 
 Please honour `Retry-After`, cache what you can (a departure board doesn't
 change faster than every 30 seconds or so), and send a `User-Agent` that
-says who you are.
+says who you are. Requests are logged (endpoint, timing, status, forwarded
+IP, user agent) to keep the usage dashboards honest. Nothing else is kept.
 
-<details>
-<summary><b>The details</b></summary>
+## Legacy: `/api`
 
-<br>
-
-The per-address limit covers `/api` and `/mcp` together, over a sliding
-window. Refused requests still spend their units, so backing off is the
-only way through:
-
-```json
-{"error":"rate_limited","message":"This address has spent its allowance of 120 request units a minute (a journey is 5, a departure board 3, most other calls 1). Try again in 42 seconds.","retry_after_seconds":42}
-```
-
-When the database is busy:
-
-```json
-{"error":"database_busy","message":"Too many queries are running right now. Try again in a moment.","retry_after_seconds":1}
-```
-
-Only requests that query the database wait for it. `GET /api` and MCP
-`initialize`/`tools/list` never do.
-
-Requests are logged (endpoint, timing, status, forwarded IP, user agent)
-to keep the usage dashboards honest. Nothing else is kept.
-
-</details>
+The same endpoints were first served under `/api`, in the MCP tools' own
+JSON (`{generated_at, resolved, results, result_count}`). That is legacy:
+it still works, unchanged, but it will be removed once its last users have
+moved to `/v1`. Don't build anything new on it. [MIGRATING.md](MIGRATING.md)
+maps every old field to its `/v1` home.
 
 ## Where the data comes from
 
 Network Rail's open data feeds (TRUST movements, TD berth steps, VSTP,
 TSR, the CIF timetable and CORPUS location names) and National Rail's
-Darwin Push Port. Times are what those feeds said: nothing is smoothed or
-made up. Data © Network Rail Infrastructure Limited and Rail Delivery
-Group, used under their open data licences.
+Darwin Push Port; station names from
+[uk-railway-stations](https://github.com/davwheat/uk-railway-stations).
+Times are what those feeds said: nothing is smoothed or made up. Data ©
+Network Rail Infrastructure Limited and Rail Delivery Group, used under
+their open data licences.
