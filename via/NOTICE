@@ -1,0 +1,29 @@
+trainiac-via
+============
+
+A VIA Rail (Canada) coverage area for the Trainiac /v1 API. This project's own
+code is offered under the MIT License (see LICENSE).
+
+Contract
+--------
+src/v1.d.ts and openapi.v1.json are copied unchanged from
+https://github.com/trainiac-hq/docs so that this adapter conforms to the
+published Trainiac /v1 contract. They remain the property of the Trainiac
+project and are included here only to validate compatibility.
+
+Data
+----
+Live and scheduled data is retrieved at runtime from VIA Rail Canada's open
+feeds:
+
+  * Live tracker:  https://tsimobile.viarail.ca/data/allData.json
+  * GTFS schedule: https://www.viarail.ca/sites/all/files/gtfs/viarail.zip
+
+That data is © VIA Rail Canada Inc. and is used under the Open Government
+Licence – Canada, version 2.0:
+https://open.canada.ca/en/open-government-licence-canada
+
+This project is not affiliated with, endorsed by, or sponsored by VIA Rail
+Canada Inc. or the Trainiac project. It is intended for personal,
+non-commercial use. For commercial use, obtain data directly from VIA Rail:
+https://www.viarail.ca/en/developer-resources

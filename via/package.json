@@ -1,0 +1,21 @@
+{
+  "name": "trainiac-via",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VIA Rail (Canada) coverage area for the Trainiac /v1 API — live Canadian passenger rail in the exact Trainiac contract.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "demo": "node scripts/demo.ts",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^5.7.2"
+  }
+}

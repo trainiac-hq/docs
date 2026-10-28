@@ -1,0 +1,66 @@
+<svg width="1280" height="320" viewBox="0 0 1280 320" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Trainiac VIA Rail: live Canadian rail data in the Trainiac shape">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1280" y2="320" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cfe0f8"/>
+      <stop offset="0.42" stop-color="#f6dde9"/>
+      <stop offset="0.72" stop-color="#efe6f3"/>
+      <stop offset="1" stop-color="#e4ddf4"/>
+    </linearGradient>
+    <radialGradient id="warm" cx="0" cy="1" r="1" gradientTransform="translate(90 300) scale(520 360)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fde9c4" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#fde9c4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rose" cx="0" cy="0" r="1" gradientTransform="translate(1180 20) scale(460 320)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd7e6" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#ffd7e6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rail" x1="0" y1="96" x2="1280" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.0"/>
+      <stop offset="0.12" stop-color="#ffffff" stop-opacity="0.75"/>
+      <stop offset="0.88" stop-color="#ffffff" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.0"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="980" y1="30" x2="1150" y2="250" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e8ecf5"/>
+    </linearGradient>
+    <linearGradient id="gloss2" x1="1070" y1="190" x2="1150" y2="270" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfe4ef"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#5b4a7a" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <!-- layered pastel sky -->
+  <rect width="1280" height="320" fill="url(#sky)"/>
+  <rect width="1280" height="320" fill="url(#warm)"/>
+  <rect width="1280" height="320" fill="url(#rose)"/>
+
+  <!-- the rail line running across -->
+  <rect y="94" width="1280" height="24" fill="url(#rail)"/>
+  <line x1="0" y1="118" x2="1280" y2="118" stroke="#ffffff" stroke-opacity="0.9" stroke-width="1.5"/>
+  <line x1="0" y1="95" x2="1280" y2="95" stroke="#b9c4e8" stroke-opacity="0.35" stroke-width="1"/>
+
+  <!-- glossy rail-and-signal motif, right -->
+  <g filter="url(#soft)">
+    <rect x="1024" y="44" width="44" height="170" rx="22" fill="url(#gloss)"/>
+    <circle cx="1120" cy="222" r="44" fill="url(#gloss2)"/>
+    <circle cx="1120" cy="222" r="16" fill="#ffcb06"/>
+    <circle cx="1106" cy="207" r="6" fill="#ffffff" fill-opacity="0.9"/>
+    <ellipse cx="1040" cy="72" rx="9" ry="17" fill="#ffffff" fill-opacity="0.7"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="92" y="214" font-family="'SF Pro Rounded','Arial Rounded MT Bold',Nunito,'Segoe UI',system-ui,sans-serif" font-size="92" font-weight="800" fill="#1f2a37" letter-spacing="-1">Trainiac</text>
+
+  <!-- VIA tag -->
+  <g>
+    <rect x="94" y="232" width="150" height="30" rx="15" fill="#ffcb06"/>
+    <text x="169" y="253" text-anchor="middle" font-family="'SF Pro Rounded','Arial Rounded MT Bold',Nunito,system-ui,sans-serif" font-size="16" font-weight="800" fill="#1f2a37" letter-spacing="1.5">VIA RAIL · CA</text>
+  </g>
+
+  <!-- subtitle -->
+  <text x="262" y="254" font-family="'SF Pro Rounded','Arial Rounded MT Bold',Nunito,'Segoe UI',system-ui,sans-serif" font-size="25" font-weight="700" fill="#49566b">Live Canadian rail, in the Trainiac shape.</text>
+</svg>
