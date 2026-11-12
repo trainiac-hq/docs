@@ -205,6 +205,7 @@ Bay Area data is provided by [511.org](https://511.org/open-data).
 | `from_time` | now | Only trains leaving at or after this time |
 | `to_time` | — | Only trains leaving at or before this time |
 | `calling_at` | — | Only trains that stop here later on |
+| `network` | `gb` | `gb`, or `bay_area` for [the Bay Area](#the-san-francisco-bay-area) |
 
 Late trains stay on the board until their *expected* time passes.
 
@@ -287,6 +288,7 @@ against live running. 5 units, or 2 with `max_changes=0`.
 | `max_changes` | 1 | 0–8. `0` means direct trains only |
 | `min_interchange_min` | 5 | 1–60. The least time to allow for a change |
 | `from_time` / `to_time` | now / — | When to leave, UK time |
+| `network` | `gb` | `gb`, or `bay_area` for [the Bay Area](#the-san-francisco-bay-area) |
 
 ```ts
 type Journey =
@@ -362,6 +364,7 @@ Where one train is right now. 1 unit.
 | `train_id` | The exact id from a departure or journey. Never ambiguous |
 | `operator`, `origin`, `destination` | Narrow a headcode down |
 | `date` | `YYYY-MM-DD` for a past run. Defaults to the last 12 hours |
+| `network` | `gb` | `gb`, or `bay_area` for [the Bay Area](#the-san-francisco-bay-area) |
 
 You need `headcode` or `train_id`. Headcodes repeat, so a headcode alone
 can return up to ten trains, most recently seen first.
@@ -421,6 +424,8 @@ is a `train_not_found` error.
 `GET /v1/stations?q=paddington`. Find a station's code. Words match in any
 order, best match first. 1 unit.
 
+Add `network=bay_area` for [the Bay Area](#the-san-francisco-bay-area).
+
 ```ts
 type StationSearch = {
   resolves_to: Resolution | null;   // the group, alias or landmark your words name, if any
@@ -459,6 +464,8 @@ other open data.
 `GET /v1/stations/{station}/activity?limit=15`. What actually happened at a
 station in the last three hours, newest first. 1 unit.
 
+Add `network=bay_area` for [the Bay Area](#the-san-francisco-bay-area).
+
 ```ts
 type Movement = {
   train: { id: string; headcode: string };
@@ -474,6 +481,8 @@ type Movement = {
 
 `GET /v1/delays?min_minutes=10&limit=15&passenger_only=true`. The most
 delayed trains running right now, worst first. 1 unit.
+
+Add `network=bay_area` for [the Bay Area](#the-san-francisco-bay-area).
 
 ```ts
 type DelayedTrain = {
@@ -491,6 +500,8 @@ type DelayedTrain = {
 
 `GET /v1/cancellations?limit=15&passenger_only=false`. Today's
 cancellations, newest first, with the reason in plain English. 1 unit.
+
+Add `network=bay_area` for [the Bay Area](#the-san-francisco-bay-area).
 
 ```ts
 type Cancellation = {
@@ -536,6 +547,8 @@ like), which you may want to leave out of a "what went wrong today" view.
 ### Summary
 
 `GET /v1/summary`. Today's headline numbers, as one object. 1 unit.
+
+Add `network=bay_area` for [the Bay Area](#the-san-francisco-bay-area).
 
 ```json
 {
