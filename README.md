@@ -5,7 +5,8 @@
 Live UK train data, free, as typed JSON. Ask for a station's departures,
 plan a journey, find where a train is right now, or see today's delays and
 cancellations. It's all built from Network Rail's open feeds and National
-Rail's Darwin forecasts.
+Rail's Darwin forecasts. Caltrain and BART in the San Francisco Bay Area
+are there too: [add `network=bay_area`](#the-san-francisco-bay-area).
 
 No sign-up, no API keys. Everything is a `GET`, and it works straight from a
 browser (CORS is open).
@@ -58,9 +59,10 @@ Base URL: `https://api.traini.ac`. `GET /v1` lists everything as JSON.
 3. **Stations can be written however you like:** a code (`PAD`), a name
    (`London Paddington`, percent-encoded in a path) or a group (`London`).
    Answers always use proper names: London Paddington, not PADDINGTON LONDON.
-4. **Times are UK time, with the offset**, like `2026-10-05T14:26:00+01:00`.
-   When you send a time, use `HH:MM`. Dates are `YYYY-MM-DD`. Delays are in
-   minutes, and negative means early.
+4. **Times are UK time, with the offset**, like `2026-10-05T14:26:00+01:00`
+   (Bay Area time when you ask about the Bay Area). When you send a time,
+   use `HH:MM`. Dates are `YYYY-MM-DD`. Delays are in minutes, and negative
+   means early.
 
 ## Every answer looks the same
 
@@ -154,6 +156,42 @@ type Resolution =
   | { type: "station"; crs: string; name: string }
   | { type: "group"; name: string; stations: Station[] };
 ```
+
+## The San Francisco Bay Area
+
+Every endpoint also answers for Caltrain and BART. Add `network=bay_area`
+to the query:
+
+```sh
+curl 'https://api.traini.ac/v1/departures/Millbrae?network=bay_area'
+curl 'https://api.traini.ac/v1/journey/Palo%20Alto/Powell%20Street?network=bay_area'
+curl 'https://api.traini.ac/v1/train?headcode=101&network=bay_area'
+curl 'https://api.traini.ac/v1/stations?q=mission&network=bay_area'
+```
+
+Leave it out, or send `network=gb`, for Great Britain. The answers have the
+same shapes, with a few differences:
+
+- **Stations** have codes like `CT:PLACE_MLBR` (Millbrae) or `BA:901509`
+  (16th Street / Mission). Send a name or a code; `/v1/stations?q=` finds
+  codes. Where Caltrain and BART share a station, it's one station.
+- **Trains** are found by Caltrain's train number (`headcode=101`) or by
+  their `train_id`, like `CT:101`. BART's trains have no number, so their
+  `headcode` is empty: use the `train_id` an answer gives you.
+- **Times** are Bay Area time, like `2026-03-02T08:21:00-08:00`. Live times
+  come from the railways' GTFS Realtime trip updates, so a forecast's
+  `source` is `trip_update`. A time that had already passed when the train
+  was last heard of is `actual`.
+- **Platforms** are the timetable's.
+- **What the Bay Area's feeds don't say is empty:** there's no coach count
+  or formation, and a cancellation's `reason` is `null`.
+- **Journeys** can change between Caltrain and BART (at Millbrae) and
+  between BART lines, up to `max_changes`.
+
+If the Bay Area's feeds are down, you get a `503` with
+`{"type": "network_unavailable"}`. A `network` we don't know is a `400`.
+
+Bay Area data is provided by [511.org](https://511.org/open-data).
 
 ## Endpoints
 
@@ -553,7 +591,7 @@ type ApiError = { message: string } & (
   | { type: "same_station" }                                                                // 400
   | { type: "parameter_out_of_range"; parameter: string; value: number; min: number; max: number } // 400
   | { type: "invalid_parameter"; parameter: string; value: string;
-      expected: "integer" | "boolean" | "time" | "date" | "headcode" }                      // 400
+      expected: "integer" | "boolean" | "time" | "date" | "headcode" | "network" }          // 400
   | { type: "missing_parameter"; parameters: string[] }  // 400: give at least one of these
   | { type: "train_not_found" }                          // 404
   | { type: "not_found" }                                // 404: no such endpoint
@@ -563,6 +601,7 @@ type ApiError = { message: string } & (
   | { type: "database_unavailable" }                     // 503
   | { type: "query_failed" }                             // 503
   | { type: "status_unavailable"; retry_after_seconds: number } // 503
+  | { type: "network_unavailable"; network: string }    // 503: that railway's feeds are down
   | { type: "internal_error" }                           // 500: our bug
 );
 ```
@@ -717,3 +756,8 @@ Darwin Push Port; station names from
 Times are what those feeds said: nothing is smoothed or made up. Data ©
 Network Rail Infrastructure Limited and Rail Delivery Group, used under
 their open data licences.
+
+The Bay Area's timetables and trip updates come from
+[511.org](https://511.org/open-data)'s GTFS and GTFS Realtime feeds for
+Caltrain and BART. Data provided by 511.org, under the
+[511 Open Data Agreement](https://511.org/sites/default/files/pdfs/511_Data_Agreement_Final.pdf).

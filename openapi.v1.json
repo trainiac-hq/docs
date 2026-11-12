@@ -3,7 +3,7 @@
   "info": {
     "title": "traini.ac API",
     "version": "1",
-    "description": "Live UK rail data from Network Rail's and National Rail's open feeds. Every answer is an Ok or an ErrorResponse, told apart by `type` and by the HTTP status. Every key is always present: null means a value does not exist, and states (cancelled, no information yet, withheld) are union members with a `type`."
+    "description": "Live UK rail data from Network Rail's and National Rail's open feeds. Every answer is an Ok or an ErrorResponse, told apart by `type` and by the HTTP status. Every key is always present: null means a value does not exist, and states (cancelled, no information yet, withheld) are union members with a `type`. Every tool answers for Great Britain by default, and for Caltrain and BART in the San Francisco Bay Area with network=bay_area (data provided by 511.org). A Bay Area answer has the same shape: its stations' codes stand where a CRS does (CT:PLACE_MLBR), its trains' ids are their uids (CT:101), and its times carry the Bay Area's offset."
   },
   "servers": [
     {
@@ -122,7 +122,7 @@
             "name": "from_time",
             "in": "query",
             "required": false,
-            "description": "HH:MM or HHMM, UK local. Default now.",
+            "description": "HH:MM or HHMM, the railway's local time. Default now.",
             "schema": {
               "type": "string"
             }
@@ -131,7 +131,7 @@
             "name": "to_time",
             "in": "query",
             "required": false,
-            "description": "HH:MM or HHMM, UK local. Default end of day.",
+            "description": "HH:MM or HHMM, the railway's local time. Default end of day.",
             "schema": {
               "type": "string"
             }
@@ -143,6 +143,19 @@
             "description": "Only services calling here later. A CRS code (PAD), a name (London Paddington, percent-encoded) or a group (London).",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "network",
+            "in": "query",
+            "required": false,
+            "description": "Which railway: gb (Great Britain, the default) or bay_area (Caltrain and BART in the San Francisco Bay Area). A 503 network_unavailable when the Bay Area's feeds aren't being fetched.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "gb",
+                "bay_area"
+              ]
             }
           }
         ],
@@ -281,7 +294,7 @@
             "name": "from_time",
             "in": "query",
             "required": false,
-            "description": "HH:MM or HHMM, UK local. Default now.",
+            "description": "HH:MM or HHMM, the railway's local time. Default now.",
             "schema": {
               "type": "string"
             }
@@ -290,9 +303,22 @@
             "name": "to_time",
             "in": "query",
             "required": false,
-            "description": "HH:MM or HHMM, UK local. Default end of day.",
+            "description": "HH:MM or HHMM, the railway's local time. Default end of day.",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "network",
+            "in": "query",
+            "required": false,
+            "description": "Which railway: gb (Great Britain, the default) or bay_area (Caltrain and BART in the San Francisco Bay Area). A 503 network_unavailable when the Bay Area's feeds aren't being fetched.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "gb",
+                "bay_area"
+              ]
             }
           }
         ],
@@ -430,6 +456,19 @@
               "type": "string",
               "format": "date"
             }
+          },
+          {
+            "name": "network",
+            "in": "query",
+            "required": false,
+            "description": "Which railway: gb (Great Britain, the default) or bay_area (Caltrain and BART in the San Francisco Bay Area). A 503 network_unavailable when the Bay Area's feeds aren't being fetched.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "gb",
+                "bay_area"
+              ]
+            }
           }
         ],
         "responses": {
@@ -539,6 +578,19 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "network",
+            "in": "query",
+            "required": false,
+            "description": "Which railway: gb (Great Britain, the default) or bay_area (Caltrain and BART in the San Francisco Bay Area). A 503 network_unavailable when the Bay Area's feeds aren't being fetched.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "gb",
+                "bay_area"
+              ]
+            }
           }
         ],
         "responses": {
@@ -639,6 +691,19 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "network",
+            "in": "query",
+            "required": false,
+            "description": "Which railway: gb (Great Britain, the default) or bay_area (Caltrain and BART in the San Francisco Bay Area). A 503 network_unavailable when the Bay Area's feeds aren't being fetched.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "gb",
+                "bay_area"
+              ]
+            }
           }
         ],
         "responses": {
@@ -720,7 +785,21 @@
         "operationId": "summary",
         "summary": "Today's headline numbers.",
         "x-request-units": 1,
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "network",
+            "in": "query",
+            "required": false,
+            "description": "Which railway: gb (Great Britain, the default) or bay_area (Caltrain and BART in the San Francisco Bay Area). A 503 network_unavailable when the Bay Area's feeds aren't being fetched.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "gb",
+                "bay_area"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "ok",
@@ -808,6 +887,19 @@
             "description": "A name fragment, in any word order, or a code.",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "network",
+            "in": "query",
+            "required": false,
+            "description": "Which railway: gb (Great Britain, the default) or bay_area (Caltrain and BART in the San Francisco Bay Area). A 503 network_unavailable when the Bay Area's feeds aren't being fetched.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "gb",
+                "bay_area"
+              ]
             }
           }
         ],
@@ -908,6 +1000,19 @@
             "schema": {
               "type": "integer",
               "minimum": 1
+            }
+          },
+          {
+            "name": "network",
+            "in": "query",
+            "required": false,
+            "description": "Which railway: gb (Great Britain, the default) or bay_area (Caltrain and BART in the San Francisco Bay Area). A 503 network_unavailable when the Bay Area's feeds aren't being fetched.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "gb",
+                "bay_area"
+              ]
             }
           }
         ],
@@ -1075,7 +1180,7 @@
         "properties": {
           "crs": {
             "type": "string",
-            "description": "Three-letter CRS code."
+            "description": "Three-letter CRS code; in the Bay Area, the station's code (CT:PLACE_MLBR)."
           },
           "name": {
             "type": "string",
@@ -1151,7 +1256,7 @@
         "properties": {
           "code": {
             "type": "string",
-            "description": "ATOC code, e.g. GW."
+            "description": "ATOC code, e.g. GW; in the Bay Area, the railway's code (CT, BA)."
           },
           "name": {
             "type": [
@@ -1191,7 +1296,7 @@
           "at": {
             "type": "string",
             "format": "date-time",
-            "description": "ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00."
+            "description": "ISO 8601 with the railway's offset, e.g. 2026-10-05T14:26:00+01:00."
           }
         },
         "required": [
@@ -1211,15 +1316,16 @@
           "at": {
             "type": "string",
             "format": "date-time",
-            "description": "ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00."
+            "description": "ISO 8601 with the railway's offset, e.g. 2026-10-05T14:26:00+01:00."
           },
           "source": {
             "type": "string",
             "enum": [
               "darwin",
-              "live_report"
+              "live_report",
+              "trip_update"
             ],
-            "description": "darwin: National Rail's forecast. live_report: the last TRUST report's lateness carried forward."
+            "description": "darwin: National Rail's forecast. live_report: the last TRUST report's lateness carried forward. trip_update: the Bay Area railway's GTFS Realtime trip update."
           }
         },
         "required": [
@@ -1346,7 +1452,7 @@
               "forecast",
               "timetable"
             ],
-            "description": "actual: where TRUST reported it. forecast: Darwin's. timetable: planned only, often wrong at large stations."
+            "description": "actual: where TRUST reported it. forecast: Darwin's. timetable: planned only, often wrong at large stations. In the Bay Area platforms are the timetable's."
           }
         },
         "required": [
@@ -1413,18 +1519,18 @@
               "string",
               "null"
             ],
-            "description": "TRUST train id, e.g. 671L50MK02. null until TRUST activates the train."
+            "description": "TRUST train id, e.g. 671L50MK02. null until TRUST activates the train. In the Bay Area, the run's uid (CT:101)."
           },
           "uid": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Timetable (CIF) uid, e.g. GW001. null where the answer does not identify the schedule."
+            "description": "Timetable (CIF) uid, e.g. GW001. null where the answer does not identify the schedule. In the Bay Area, the run's uid (CT:101)."
           },
           "headcode": {
             "type": "string",
-            "description": "e.g. 1L50. Headcodes repeat across the country."
+            "description": "e.g. 1L50. Headcodes repeat across the country. In the Bay Area, Caltrain's train number (101); empty for BART, whose trains have none."
           },
           "operator": {
             "oneOf": [
@@ -1450,7 +1556,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "TRUST train id."
+            "description": "TRUST train id; in the Bay Area, the run's uid."
           },
           "headcode": {
             "type": "string"
@@ -1752,7 +1858,7 @@
               "null"
             ],
             "pattern": "^[0-2][0-9]:[0-5][0-9]$",
-            "description": "HH:MM, UK local. null when not given."
+            "description": "HH:MM, the railway's local time. null when not given."
           },
           "to_time": {
             "type": [
@@ -1760,10 +1866,18 @@
               "null"
             ],
             "pattern": "^[0-2][0-9]:[0-5][0-9]$",
-            "description": "HH:MM, UK local. null when not given."
+            "description": "HH:MM, the railway's local time. null when not given."
           },
           "limit": {
             "type": "integer"
+          },
+          "network": {
+            "type": "string",
+            "enum": [
+              "gb",
+              "bay_area"
+            ],
+            "description": "The railway asked about."
           }
         },
         "required": [
@@ -1771,7 +1885,8 @@
           "calling_at",
           "from_time",
           "to_time",
-          "limit"
+          "limit",
+          "network"
         ],
         "additionalProperties": false
       },
@@ -1969,7 +2084,7 @@
               "null"
             ],
             "pattern": "^[0-2][0-9]:[0-5][0-9]$",
-            "description": "HH:MM, UK local. null when not given."
+            "description": "HH:MM, the railway's local time. null when not given."
           },
           "to_time": {
             "type": [
@@ -1977,7 +2092,15 @@
               "null"
             ],
             "pattern": "^[0-2][0-9]:[0-5][0-9]$",
-            "description": "HH:MM, UK local. null when not given."
+            "description": "HH:MM, the railway's local time. null when not given."
+          },
+          "network": {
+            "type": "string",
+            "enum": [
+              "gb",
+              "bay_area"
+            ],
+            "description": "The railway asked about."
           }
         },
         "required": [
@@ -1987,7 +2110,8 @@
           "max_changes",
           "min_interchange_min",
           "from_time",
-          "to_time"
+          "to_time",
+          "network"
         ],
         "additionalProperties": false
       },
@@ -2008,7 +2132,7 @@
           "at": {
             "type": "string",
             "format": "date-time",
-            "description": "ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00."
+            "description": "ISO 8601 with the railway's offset, e.g. 2026-10-05T14:26:00+01:00."
           },
           "event": {
             "type": "string",
@@ -2214,6 +2338,14 @@
               "null"
             ],
             "format": "date"
+          },
+          "network": {
+            "type": "string",
+            "enum": [
+              "gb",
+              "bay_area"
+            ],
+            "description": "The railway asked about."
           }
         },
         "required": [
@@ -2222,7 +2354,8 @@
           "operator",
           "origin",
           "destination",
-          "date"
+          "date",
+          "network"
         ],
         "additionalProperties": false
       },
@@ -2242,7 +2375,7 @@
           "at": {
             "type": "string",
             "format": "date-time",
-            "description": "ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00."
+            "description": "ISO 8601 with the railway's offset, e.g. 2026-10-05T14:26:00+01:00."
           }
         },
         "required": [
@@ -2312,12 +2445,21 @@
           },
           "passenger_only": {
             "type": "boolean"
+          },
+          "network": {
+            "type": "string",
+            "enum": [
+              "gb",
+              "bay_area"
+            ],
+            "description": "The railway asked about."
           }
         },
         "required": [
           "min_minutes",
           "limit",
-          "passenger_only"
+          "passenger_only",
+          "network"
         ],
         "additionalProperties": false
       },
@@ -2479,7 +2621,15 @@
             "$ref": "#/components/schemas/CancellationKind"
           },
           "reason": {
-            "$ref": "#/components/schemas/CancellationReason"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CancellationReason"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null where the railway gives no reason: a Bay Area trip update cancels a train and says nothing of why."
           },
           "reported_at": {
             "type": "string",
@@ -2512,11 +2662,20 @@
           },
           "passenger_only": {
             "type": "boolean"
+          },
+          "network": {
+            "type": "string",
+            "enum": [
+              "gb",
+              "bay_area"
+            ],
+            "description": "The railway asked about."
           }
         },
         "required": [
           "limit",
-          "passenger_only"
+          "passenger_only",
+          "network"
         ],
         "additionalProperties": false
       },
@@ -2565,11 +2724,20 @@
           },
           "limit": {
             "type": "integer"
+          },
+          "network": {
+            "type": "string",
+            "enum": [
+              "gb",
+              "bay_area"
+            ],
+            "description": "The railway asked about."
           }
         },
         "required": [
           "station",
-          "limit"
+          "limit",
+          "network"
         ],
         "additionalProperties": false
       },
@@ -2714,10 +2882,19 @@
           "q": {
             "type": "string",
             "description": "The query as searched."
+          },
+          "network": {
+            "type": "string",
+            "enum": [
+              "gb",
+              "bay_area"
+            ],
+            "description": "The railway asked about."
           }
         },
         "required": [
-          "q"
+          "q",
+          "network"
         ],
         "additionalProperties": false
       },
@@ -2998,7 +3175,7 @@
           "measured_at": {
             "type": "string",
             "format": "date-time",
-            "description": "ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00."
+            "description": "ISO 8601 with the railway's offset, e.g. 2026-10-05T14:26:00+01:00."
           }
         },
         "required": [
@@ -3220,7 +3397,8 @@
               "boolean",
               "time",
               "date",
-              "headcode"
+              "headcode",
+              "network"
             ]
           },
           "message": {
@@ -3489,6 +3667,9 @@
             "$ref": "#/components/schemas/ErrorQueryFailed"
           },
           {
+            "$ref": "#/components/schemas/ErrorNetworkUnavailable"
+          },
+          {
             "$ref": "#/components/schemas/ErrorStatusUnavailable"
           },
           {
@@ -3511,6 +3692,7 @@
             "database_busy": "#/components/schemas/ErrorDatabaseBusy",
             "database_unavailable": "#/components/schemas/ErrorDatabaseUnavailable",
             "query_failed": "#/components/schemas/ErrorQueryFailed",
+            "network_unavailable": "#/components/schemas/ErrorNetworkUnavailable",
             "status_unavailable": "#/components/schemas/ErrorStatusUnavailable",
             "internal_error": "#/components/schemas/ErrorInternal"
           }
@@ -3691,7 +3873,7 @@
             "const": "ok"
           },
           "request": {
-            "$ref": "#/components/schemas/EmptyRequest"
+            "$ref": "#/components/schemas/SummaryRequest"
           },
           "data": {
             "$ref": "#/components/schemas/Summary"
@@ -3818,6 +4000,46 @@
           "request",
           "data",
           "generated_at"
+        ],
+        "additionalProperties": false
+      },
+      "SummaryRequest": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "type": "string",
+            "enum": [
+              "gb",
+              "bay_area"
+            ],
+            "description": "The railway asked about."
+          }
+        },
+        "required": [
+          "network"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorNetworkUnavailable": {
+        "description": "HTTP 503. The railway asked about isn't being fetched right now.",
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "network_unavailable"
+          },
+          "network": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "description": "For a person reading a log. Branch on type, never on this."
+          }
+        },
+        "required": [
+          "type",
+          "network",
+          "message"
         ],
         "additionalProperties": false
       }

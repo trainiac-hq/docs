@@ -2,12 +2,14 @@
 // contract and run `bun run generate` in shared/api.
 
 /**
- * Live UK rail data from Network Rail's and National Rail's open feeds. Every answer is an Ok or an ErrorResponse, told apart by `type` and by the HTTP status. Every key is always present: null means a value does not exist, and states (cancelled, no information yet, withheld) are union members with a `type`.
+ * Live UK rail data from Network Rail's and National Rail's open feeds. Every answer is an Ok or an ErrorResponse, told apart by `type` and by the HTTP status. Every key is always present: null means a value does not exist, and states (cancelled, no information yet, withheld) are union members with a `type`. Every tool answers for Great Britain by default, and for Caltrain and BART in the San Francisco Bay Area with network=bay_area (data provided by 511.org). A Bay Area answer has the same shape: its stations' codes stand where a CRS does (CT:PLACE_MLBR), its trains' ids are their uids (CT:101), and its times carry the Bay Area's offset.
  */
 
 /** A public station. */
 export type Station = {
-	/** Three-letter CRS code. */
+	/**
+	 * Three-letter CRS code; in the Bay Area, the station's code (CT:PLACE_MLBR).
+	 */
 	crs: string;
 	/** Proper name, e.g. London Paddington. */
 	name: string;
@@ -32,7 +34,7 @@ export type PlaceLocation = {
 export type Place = PlaceStation | PlaceLocation;
 
 export type Operator = {
-	/** ATOC code, e.g. GW. */
+	/** ATOC code, e.g. GW; in the Bay Area, the railway's code (CT, BA). */
 	code: string;
 	/** e.g. Great Western Railway. null when we have no name for the code. */
 	name: string | null;
@@ -46,19 +48,19 @@ export type ServiceClass = "passenger" | "bus" | "freight" | "ship" | "trip" | "
 /** It has happened, at this time. */
 export type EstimateActual = {
 	type: "actual";
-	/** ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00. */
+	/** ISO 8601 with the railway's offset, e.g. 2026-10-05T14:26:00+01:00. */
 	at: string;
 };
 
 /** Expected at this time. */
 export type EstimateForecast = {
 	type: "forecast";
-	/** ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00. */
+	/** ISO 8601 with the railway's offset, e.g. 2026-10-05T14:26:00+01:00. */
 	at: string;
 	/**
-	 * darwin: National Rail's forecast. live_report: the last TRUST report's lateness carried forward.
+	 * darwin: National Rail's forecast. live_report: the last TRUST report's lateness carried forward. trip_update: the Bay Area railway's GTFS Realtime trip update.
 	 */
-	source: "darwin" | "live_report";
+	source: "darwin" | "live_report" | "trip_update";
 };
 
 /** Known to be late, by an amount nobody can say yet. */
@@ -95,7 +97,7 @@ export type PlatformKnown = {
 	/** A platform is a string: 4A, 10, B. */
 	number: string;
 	/**
-	 * actual: where TRUST reported it. forecast: Darwin's. timetable: planned only, often wrong at large stations.
+	 * actual: where TRUST reported it. forecast: Darwin's. timetable: planned only, often wrong at large stations. In the Bay Area platforms are the timetable's.
 	 */
 	source: "actual" | "forecast" | "timetable";
 };
@@ -114,20 +116,22 @@ export type Platform = PlatformKnown | PlatformWithheld | PlatformUnknown;
 
 export type Train = {
 	/**
-	 * TRUST train id, e.g. 671L50MK02. null until TRUST activates the train.
+	 * TRUST train id, e.g. 671L50MK02. null until TRUST activates the train. In the Bay Area, the run's uid (CT:101).
 	 */
 	id: string | null;
 	/**
-	 * Timetable (CIF) uid, e.g. GW001. null where the answer does not identify the schedule.
+	 * Timetable (CIF) uid, e.g. GW001. null where the answer does not identify the schedule. In the Bay Area, the run's uid (CT:101).
 	 */
 	uid: string | null;
-	/** e.g. 1L50. Headcodes repeat across the country. */
+	/**
+	 * e.g. 1L50. Headcodes repeat across the country. In the Bay Area, Caltrain's train number (101); empty for BART, whose trains have none.
+	 */
 	headcode: string;
 	operator: Operator | null;
 };
 
 export type TrainRef = {
-	/** TRUST train id. */
+	/** TRUST train id; in the Bay Area, the run's uid. */
 	id: string;
 	headcode: string;
 };
@@ -212,11 +216,13 @@ export type Departure = {
 export type DeparturesRequest = {
 	station: StationArgument;
 	calling_at: StationArgument | null;
-	/** HH:MM, UK local. null when not given. */
+	/** HH:MM, the railway's local time. null when not given. */
 	from_time: string | null;
-	/** HH:MM, UK local. null when not given. */
+	/** HH:MM, the railway's local time. null when not given. */
 	to_time: string | null;
 	limit: number;
+	/** The railway asked about. */
+	network: "gb" | "bay_area";
 };
 
 /**
@@ -272,10 +278,12 @@ export type JourneyRequest = {
 	limit: number;
 	max_changes: number;
 	min_interchange_min: number;
-	/** HH:MM, UK local. null when not given. */
+	/** HH:MM, the railway's local time. null when not given. */
 	from_time: string | null;
-	/** HH:MM, UK local. null when not given. */
+	/** HH:MM, the railway's local time. null when not given. */
 	to_time: string | null;
+	/** The railway asked about. */
+	network: "gb" | "bay_area";
 };
 
 /**
@@ -283,7 +291,7 @@ export type JourneyRequest = {
  */
 export type Report = {
 	location: Place | null;
-	/** ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00. */
+	/** ISO 8601 with the railway's offset, e.g. 2026-10-05T14:26:00+01:00. */
 	at: string;
 	/** TRUST reports a pass as a departure. */
 	event: "arrival" | "departure";
@@ -337,11 +345,13 @@ export type TrainRequest = {
 	origin: string | null;
 	destination: string | null;
 	date: string | null;
+	/** The railway asked about. */
+	network: "gb" | "bay_area";
 };
 
 export type LastSeen = {
 	location: Place | null;
-	/** ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00. */
+	/** ISO 8601 with the railway's offset, e.g. 2026-10-05T14:26:00+01:00. */
 	at: string;
 };
 
@@ -359,6 +369,8 @@ export type DelaysRequest = {
 	min_minutes: number;
 	limit: number;
 	passenger_only: boolean;
+	/** The railway asked about. */
+	network: "gb" | "bay_area";
 };
 
 export type CancellationReason = {
@@ -412,7 +424,10 @@ export type Cancellation = {
 	origin: Place | null;
 	destination: Place | null;
 	cancelled: CancellationKind;
-	reason: CancellationReason;
+	/**
+	 * null where the railway gives no reason: a Bay Area trip update cancels a train and says nothing of why.
+	 */
+	reason: CancellationReason | null;
 	/** When we received it. */
 	reported_at: string;
 	/**
@@ -424,6 +439,8 @@ export type Cancellation = {
 export type CancellationsRequest = {
 	limit: number;
 	passenger_only: boolean;
+	/** The railway asked about. */
+	network: "gb" | "bay_area";
 };
 
 /** A movement TRUST reported at the station. */
@@ -439,6 +456,8 @@ export type Movement = {
 export type ActivityRequest = {
 	station: StationArgument;
 	limit: number;
+	/** The railway asked about. */
+	network: "gb" | "bay_area";
 };
 
 export type StationMatchStation = {
@@ -477,6 +496,8 @@ export type StationSearch = {
 export type StationsRequest = {
 	/** The query as searched. */
 	q: string;
+	/** The railway asked about. */
+	network: "gb" | "bay_area";
 };
 
 export type Summary = {
@@ -552,7 +573,7 @@ export type Status = {
 		darwin: Feed;
 	};
 	trains_running: TrainsRunning;
-	/** ISO 8601 with the UK offset, e.g. 2026-10-05T14:26:00+01:00. */
+	/** ISO 8601 with the railway's offset, e.g. 2026-10-05T14:26:00+01:00. */
 	measured_at: string;
 };
 
@@ -620,7 +641,7 @@ export type ErrorInvalidParameter = {
 	type: "invalid_parameter";
 	parameter: string;
 	value: string;
-	expected: "integer" | "boolean" | "time" | "date" | "headcode";
+	expected: "integer" | "boolean" | "time" | "date" | "headcode" | "network";
 	/** For a person reading a log. Branch on type, never on this. */
 	message: string;
 };
@@ -700,7 +721,7 @@ export type ErrorInternal = {
 	message: string;
 };
 
-export type ApiError = ErrorStationNotFound | ErrorStationAmbiguous | ErrorSameStation | ErrorParameterOutOfRange | ErrorInvalidParameter | ErrorMissingParameter | ErrorTrainNotFound | ErrorNotFound | ErrorMethodNotAllowed | ErrorRateLimited | ErrorDatabaseBusy | ErrorDatabaseUnavailable | ErrorQueryFailed | ErrorStatusUnavailable | ErrorInternal;
+export type ApiError = ErrorStationNotFound | ErrorStationAmbiguous | ErrorSameStation | ErrorParameterOutOfRange | ErrorInvalidParameter | ErrorMissingParameter | ErrorTrainNotFound | ErrorNotFound | ErrorMethodNotAllowed | ErrorRateLimited | ErrorDatabaseBusy | ErrorDatabaseUnavailable | ErrorQueryFailed | ErrorNetworkUnavailable | ErrorStatusUnavailable | ErrorInternal;
 
 export type ErrorResponse = {
 	type: "error";
@@ -749,7 +770,7 @@ export type CancellationsResponse = {
 
 export type SummaryResponse = {
 	type: "ok";
-	request: EmptyRequest;
+	request: SummaryRequest;
 	data: Summary;
 	/** When the database answered. */
 	generated_at: string;
@@ -785,6 +806,19 @@ export type IndexResponse = {
 	data: Index;
 	/** When the database answered. */
 	generated_at: string;
+};
+
+export type SummaryRequest = {
+	/** The railway asked about. */
+	network: "gb" | "bay_area";
+};
+
+/** HTTP 503. The railway asked about isn't being fetched right now. */
+export type ErrorNetworkUnavailable = {
+	type: "network_unavailable";
+	network: string;
+	/** For a person reading a log. Branch on type, never on this. */
+	message: string;
 };
 
 /** What a 200 from each path carries. Every other status is an `ErrorResponse`. */
